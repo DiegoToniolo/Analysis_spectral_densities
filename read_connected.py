@@ -1,6 +1,7 @@
 import sys
 import subprocess
 import numpy as np
+import re
 
 #Class definitions
 #Class of the imput file
@@ -38,28 +39,36 @@ class Input_file:
 class Read_connected:
     def __init__(self,  in_f: Input_file):
         for i in range(len(in_f.corr_runs_v1)):
-            self.l0_v1 = self.level0_to_read(in_f.corr_runs_path + in_f.corr_runs_v1[i] + "/dat")
-            self.lines_l0_v1 = self.l0_v1.split()
+            self.l0_v1 = self.level0_to_read(in_f.corr_runs_path + in_f.corr_runs_v1[i] + "/dat/")
+            for f_to_read in self.l0_v1:
+                self.read_level1_config(in_f.corr_runs_path + in_f.corr_runs_v1[i] + "/dat/" + f_to_read)
 
-        for i in range(len(in_f.corr_runs_v2)):
-            self.l0_v2 = self.level0_to_read(in_f.corr_runs_path + in_f.corr_runs_v2[i] + "/dat")
-            self.lines_l0_v2 = self.l0_v2.split()
+        #TO BE IMPLEMENTED
+        #for i in range(len(in_f.corr_runs_v2)):
+        #    self.l0_v2 = self.level0_to_read(in_f.corr_runs_path + in_f.corr_runs_v2[i] + "/dat/")
         
     def level0_to_read(self, path: str):
-        cmd = ['ls', path + "/*.dat"]
-        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        cmd_cd = ['ls', path]
+        proc = subprocess.Popen(cmd_cd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
         o, e = proc.communicate()
-        run_dir_content = o.decode()
         err = e.decode()
         if err != '':
-            print("Error in reading the file content a run")
+            print("Error in changing directory")
             print(err)
             exit(1)
-        return run_dir_content
         
+        runs_to_read = []
+        for string in o.decode().split():
+            if len(re.findall("dat$", string)) != 0:
+                runs_to_read.append(string)
 
-    #def read_level1_config():
+        return runs_to_read
+        
+    def read_level1_config(self, file_path: str):
+        f = open(file_path, "rb")
+        f.close()
+        
         
 
 #Exectution

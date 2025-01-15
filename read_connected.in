@@ -1,6 +1,6 @@
 [INPUT PATHS]
 corr_runs_path /home/saccardi/MB-DD-HMC/backup/ms7/F7g/run
 weight_runs_path /home/saccardi/MB-DD-HMC/backup/ms1/F7g/run
-corr_runs_v1 3 4 5 6 7
+corr_runs_v1 4
 corr_runs_v2 3_marenostrum
 weight_runs 1
