@@ -40,8 +40,10 @@ class Read_connected:
     def __init__(self,  in_f: Input_file):
         for i in range(len(in_f.corr_runs_v1)):
             self.l0_v1 = self.level0_to_read(in_f.corr_runs_path + in_f.corr_runs_v1[i] + "/dat/")
-            for f_to_read in self.l0_v1:
-                self.read_level1_config(in_f.corr_runs_path + in_f.corr_runs_v1[i] + "/dat/" + f_to_read)
+            for j in range(1):
+                f_to_read = self.l0_v1[j]
+            #for f_to_read in self.l0_v1: WHEN READY
+                self.read_level1_config(in_f.corr_runs_path + in_f.corr_runs_v1[i] + "/dat/" + f_to_read, endian='little', version='V1')
 
         #TO BE IMPLEMENTED
         #for i in range(len(in_f.corr_runs_v2)):
@@ -65,8 +67,43 @@ class Read_connected:
 
         return runs_to_read
         
-    def read_level1_config(self, file_path: str):
+    def read_level1_config(self, file_path: str, endian:str='little', version:str='V1'):
+        if endian == 'little':
+            end = '<'
+        elif endian == 'big':
+            end = '>'
+        else:
+            print("Wrong specification of endianness")
+            exit(1)
         f = open(file_path, "rb")
+        #Reading header
+        tmp = np.fromfile(f, dtype=end + 'i4', count = 5)
+        header = {'m0': tmp[0], 'n_source': tmp[1], 'n_op': tmp[2], 't_max': tmp[3], 'n_slice': 2}
+        
+        #Reading configurations
+        if version == 'V1':
+            conf = np.fromfile(f, dtype=end + 'i4', count = header['n_slice'])
+            src_pos = np.zeros((header['n_source'], 4))
+        
+            for src in range(header['n_source']):
+                src_pos[src] = np.fromfile(f, dtype=end + 'i4', count = 4)
+
+            for m in range(header['m0']):
+                for s in range(header['n_source']):
+                #for s in range(1):
+                    for op in range(header['n_op']):
+                    #for op in range(1):
+                        for t in range(header['t_max']):
+                            np.fromfile(f, dtype=end + 'f8', count = 2)
+            
+            for m in range(header['m0']):
+                for s in range(header['n_source']):
+                #for s in range(1):
+                    for op in range(4):
+                    #for op in range(1):
+                        for t in range(header['t_max']):
+                            np.fromfile(f, dtype=end + 'f8', count = 2)
+            print(np.fromfile(f, dtype=end + 'i4', count = header['n_slice']))
         f.close()
         
         
