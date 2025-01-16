@@ -71,6 +71,13 @@ class Data_conn:
 
     def set_y0(self, y0:int=0):
         self.y0 = y0
+    
+class Data_weight:
+    def __init__(self, n_rw:int = 0, n_c:int = 0):
+        self.set_dims(n_rw, n_c)
+    
+    def set_dims(self, n_rw:int, n_c:int):
+        self.configuration = np.zeros((n_rw, n_c))
         
 class Read_connected:
     def __init__(self,  in_f: Input_file):
@@ -81,7 +88,18 @@ class Read_connected:
         self.v1_to_merge = []
         for s in in_f.to_merge:
             self.v1_to_merge.append(s.split('-'))
-
+        
+        #Reading weights
+        for i in range(len(in_f.weight_runs)):
+            self.write_log("Reading weight run number " + in_f.corr_runs_v1[i] + ", version 1", self.log)
+            self.l0_w = self.level0_to_read(in_f.weight_runs_path + in_f.weight_runs[i] + "/dat/")
+            count = 1
+            self.l1_w_config = []
+            for f_to_read in self.l0_w:
+                self.write_log("\tReading level 0 configuration number {}".format(count), self.log)
+                count += 1
+                self.l1_w_config.append(self.read_level1_weight(in_f.weight_runs_path + in_f.weight_runs[i] + "/dat/" + f_to_read, endian='little'))
+        #Reading correlators version 1
         for i in range(len(in_f.corr_runs_v1)):
             self.write_log("Reading run number " + in_f.corr_runs_v1[i] + ", version 1", self.log)
             self.l0_v1 = self.level0_to_read(in_f.corr_runs_path + in_f.corr_runs_v1[i] + "/dat/")
@@ -104,7 +122,8 @@ class Read_connected:
                         count += 1
                     in_f.corr_runs_v2 = np.delete(in_f.corr_runs_v2, np.where(in_f.corr_runs_v2 == m[1]))
                     break
-        
+
+        #Reading correlators version 2  
         for i in range(len(in_f.corr_runs_v2)):
             self.write_log("Reading run number " + in_f.corr_runs_v1[i] + ", version 2", self.log)
             self.l0_v2 = self.level0_to_read(in_f.corr_runs_path + in_f.corr_runs_v2[i] + "/dat/")
@@ -164,7 +183,8 @@ class Read_connected:
                 op_to_read[i] = 1
 
             for c in range(tot_conf):
-                self.write_log("\tReading level 1 config number {}".format(c + 1), self.log)
+                if c % 10 == 0:
+                    self.write_log("\tReading level 1 config numbers {}-{}".format(c, c + 10), self.log)
                 np.fromfile(f, dtype=end + 'i4', count = header['n_slice'])
                 src_pos = np.zeros((header['n_source'], 4))
         
@@ -232,7 +252,46 @@ class Read_connected:
             exit(1)
         return data
         f.close()
+
+    def read_level1_weight(self, file_path: str, endian:str='little') -> Data_weight:
+        if endian == 'little':
+            end = '<'
+        elif endian == 'big':
+            end = '>'
+        else:
+            sys.stdout = self.outstream
+            print("Wrong specification of endianness")
+            exit(1)
         
+        f = open(file_path, 'rb')
+
+        tmp = np.fromfile(f, dtype=end + 'i4', count = 2)
+        n_rw, n_slice = tmp[0], tmp[1]
+        n_fct, n_src = np.fromfile(f, dtype=end + 'i4', count = n_rw), np.fromfile(f, dtype=end + 'i4', count = n_rw)
+
+        if len(self.n_l1) != n_slice:
+            print("Number of level 1 configurations not correct")
+            exit(1)
+        
+        tot_conf = np.prod(self.n_l1)
+        data = Data_weight(n_rw, tot_conf)
+        for c in range(tot_conf):
+            np.fromfile(f, dtype=end + 'i4', count = n_slice)
+            for rw in range(n_rw):
+                for fct in range(n_fct[rw]):
+                    for src in range(n_src[rw]):
+                        np.fromfile(f, dtype=end + 'f8', count = 1)
+            for rw in range(n_rw):
+                tmp1 = np.zeros(n_fct[rw])
+                for fct in range(n_fct[rw]):
+                    tmp2 = np.zeros(n_src[rw])
+                    for src in range(n_src[rw]):
+                        tmp2[src] = np.fromfile(f, dtype=end + 'f8', count = 1)[0]
+                    tmp1[fct] = np.mean(np.exp(tmp2))
+                data.configuration[rw][c] = np.prod(tmp1)
+        return data
+        f.close()
+
     def write_log(self, string:'str', f):
         sys.stdout = f
         print(string, flush=True)
