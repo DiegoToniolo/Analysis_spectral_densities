@@ -3,6 +3,7 @@ import subprocess
 import numpy as np
 import re
 
+stdoustream = sys.stdout
 #Class definitions
 #Class of the imput file
 class Input_file:
@@ -34,7 +35,7 @@ class Input_file:
             if flag == 0:
                 print("Second item in merge tuple " + s + " not in version 2 list of runs")
                 exit()
-
+        self.log_file = self.read_setting("log_file")[0]
 
     
     def read_setting(self, opt_name: str, dtype='str'):
@@ -75,46 +76,47 @@ class Read_connected:
     def __init__(self,  in_f: Input_file):
         self.op = in_f.operators
         self.n_l1 = in_f.n_config_l1
-
+        self.log = open(in_f.log_file, 'w')
+        
         self.v1_to_merge = []
         for s in in_f.to_merge:
             self.v1_to_merge.append(s.split('-'))
 
         for i in range(len(in_f.corr_runs_v1)):
-            print("Reading run number " + in_f.corr_runs_v1[i] + ", version 1")
+            self.write_log("Reading run number " + in_f.corr_runs_v1[i] + ", version 1", self.log)
             self.l0_v1 = self.level0_to_read(in_f.corr_runs_path + in_f.corr_runs_v1[i] + "/dat/")
             
             count = 1
             self.l1_config = []
             for f_to_read in self.l0_v1:
-                print("Reading level 0 configuration number {}".format(count))
+                self.write_log("Reading level 0 configuration number {}".format(count), self.log)
                 count += 1
                 self.l1_config.append(self.read_level1_config(in_f.corr_runs_path + in_f.corr_runs_v1[i] + "/dat/" + f_to_read, endian='little', version='V1'))
             
             for m in self.v1_to_merge:
                 if m[0] == in_f.corr_runs_v1[i]:
-                    print("Merging to " + m[1])
+                    self.write_log("Merging to " + m[1], self.log)
                     self.l0_v2 = self.level0_to_read(in_f.corr_runs_path + m[1] + "/dat/")
                     
                     for f_to_read in self.l0_v2:
-                        print("Reading level 0 configuration number {}".format(count))
+                        self.write_log("Reading level 0 configuration number {}".format(count), self.log)
                         self.l1_config.append(self.read_level1_config(in_f.corr_runs_path + m[1] + "/dat/" + f_to_read, endian='little', version='V2'))
                         count += 1
-                        print(self.l1_config[0].configuration[99][0][0], self.l1_config[0].y0)
                     in_f.corr_runs_v2 = np.delete(in_f.corr_runs_v2, np.where(in_f.corr_runs_v2 == m[1]))
                     break
         
         for i in range(len(in_f.corr_runs_v2)):
-            print("Reading run number " + in_f.corr_runs_v1[i] + ", version 2")
+            self.write_log("Reading run number " + in_f.corr_runs_v1[i] + ", version 2", self.log)
             self.l0_v2 = self.level0_to_read(in_f.corr_runs_path + in_f.corr_runs_v2[i] + "/dat/")
 
             count = 1
             self.l1_config = []
             for f_to_read in self.l0_v2:
-                print("Reading level 0 configuration number {}".format(count))
+                self.write_log("Reading level 0 configuration number {}".format(count), self.log)
                 count += 1
                 self.l1_config.append(self.read_level1_config(in_f.corr_runs_path + in_f.corr_runs_v1[i] + "/dat/" + f_to_read, endian='little', version='V2'))
-            
+        self.log.close()
+
     def level0_to_read(self, path: str):
         cmd_cd = ['ls', path]
         proc = subprocess.Popen(cmd_cd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -133,12 +135,13 @@ class Read_connected:
 
         return runs_to_read
         
-    def read_level1_config(self, file_path: str, endian:str='little', version:str='V1'):
+    def read_level1_config(self, file_path: str, endian:str='little', version:str='V1') -> Data_conn:
         if endian == 'little':
             end = '<'
         elif endian == 'big':
             end = '>'
         else:
+            sys.stdout = self.outstream
             print("Wrong specification of endianness")
             exit(1)
         
@@ -161,7 +164,7 @@ class Read_connected:
                 op_to_read[i] = 1
 
             for c in range(tot_conf):
-                print("\tReading level 1 config number {}".format(c + 1))
+                self.write_log("\tReading level 1 config number {}".format(c + 1), self.log)
                 np.fromfile(f, dtype=end + 'i4', count = header['n_slice'])
                 src_pos = np.zeros((header['n_source'], 4))
         
@@ -205,7 +208,7 @@ class Read_connected:
                 op_to_read[i] = 1
 
             for c in range(tot_conf):
-                print("\tReading level 1 config number {}".format(c + 1))
+                self.write_log("\tReading level 1 config number {}".format(c + 1), self.log)
                 np.fromfile(f, dtype=end + 'i4', count = header['n_slice'])
                 src_pos = np.zeros((header['n_source'], 4))
         
@@ -230,6 +233,11 @@ class Read_connected:
         return data
         f.close()
         
+    def write_log(self, string:'str', f):
+        sys.stdout = f
+        print(string, flush=True)
+        sys.stdout = stdoustream
+
 #Execution
 if(len(sys.argv) < 2):
     print("Usage: python3 " + sys.argv[0] + " input_file.in")

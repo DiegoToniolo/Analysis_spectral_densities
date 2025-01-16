@@ -13,3 +13,6 @@ l1_configurations_per_slice 10 10
 
 [OPERATORS]
 op_to_average 2 3 4
+
+[OUTPUT]
+log_file /data/knuth/home/dtoniolo/Analysis_spectral_densities/log.txt
