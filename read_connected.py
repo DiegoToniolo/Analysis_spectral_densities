@@ -61,6 +61,7 @@ class Input_file:
         else:
             return tokens
 
+#Class for the structure of the unweighted correlators
 class Data_conn:
     def __init__(self, n_c:int = 0, n_src:int = 0, n_op:int = 0, n_t:int = 0, y0:int = 0):
         self.set_dims(n_c, n_src, n_op, n_t)
@@ -71,14 +72,16 @@ class Data_conn:
 
     def set_y0(self, y0:int=0):
         self.y0 = y0
-    
+
+#Class for the structure of the reweighting    
 class Data_weight:
     def __init__(self, n_rw:int = 0, n_c:int = 0):
         self.set_dims(n_rw, n_c)
     
     def set_dims(self, n_rw:int, n_c:int):
         self.configuration = np.zeros((n_rw, n_c))
-        
+
+#Class to read all the data and to perform the needed averages.       
 class Read_connected:
     def __init__(self,  in_f: Input_file):
         self.op = in_f.operators
@@ -99,6 +102,7 @@ class Read_connected:
                 self.write_log("\tReading level 0 configuration number {}".format(count), self.log)
                 count += 1
                 self.l1_w_config.append(self.read_level1_weight(in_f.weight_runs_path + in_f.weight_runs[i] + "/dat/" + f_to_read, endian='little'))
+            
         #Reading correlators version 1
         for i in range(len(in_f.corr_runs_v1)):
             self.write_log("Reading run number " + in_f.corr_runs_v1[i] + ", version 1", self.log)
@@ -286,8 +290,9 @@ class Read_connected:
                 for fct in range(n_fct[rw]):
                     tmp2 = np.zeros(n_src[rw])
                     for src in range(n_src[rw]):
-                        tmp2[src] = np.fromfile(f, dtype=end + 'f8', count = 1)[0]
-                    tmp1[fct] = np.mean(np.exp(tmp2))
+                        tmp2[src] = np.fromfile(f, dtype=end + 'f8', count = 1)[0] + 437.0
+                    #print(tmp2)
+                    tmp1[fct] = np.mean(np.exp(-tmp2))
                 data.configuration[rw][c] = np.prod(tmp1)
         return data
         f.close()
