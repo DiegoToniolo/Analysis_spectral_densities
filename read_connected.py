@@ -15,6 +15,27 @@ class Input_file:
         self.weight_runs = self.read_setting("weight_runs")
         self.operators = self.read_setting("op_to_average", dtype='int')
         self.n_config_l1 = self.read_setting("l1_configurations_per_slice", dtype='int')
+        self.to_merge = self.read_setting("to_merge")
+        for s in self.to_merge:
+            v1_v2_to_merge = s.split('-')
+            flag = 0
+            for v1 in self.corr_runs_v1:
+                if v1 == v1_v2_to_merge[0]:
+                    flag = 1
+                    break
+            if flag == 0:
+                print("First item in merge tuple " + s + " not in version 1 list of runs")
+                exit(1)
+            flag = 0
+            for v2 in self.corr_runs_v2:
+                if v2 == v1_v2_to_merge[1]:
+                    flag = 1
+                    break
+            if flag == 0:
+                print("Second item in merge tuple " + s + " not in version 2 list of runs")
+                exit()
+
+
     
     def read_setting(self, opt_name: str, dtype='str'):
         self.in_file = open(self.file_path, "r")
@@ -54,10 +75,11 @@ class Read_connected:
             #for j in range(1):
             #    f_to_read = self.l0_v1[j]
             count = 1
+            self.l1_config = []
             for f_to_read in self.l0_v1:
                 print("Reading level 0 configuration number {}".format(count))
                 count += 1
-                self.l1_config = self.read_level1_config(in_f.corr_runs_path + in_f.corr_runs_v1[i] + "/dat/" + f_to_read, endian='little', version='V1')
+                self.l1_config.append(self.read_level1_config(in_f.corr_runs_path + in_f.corr_runs_v1[i] + "/dat/" + f_to_read, endian='little', version='V1'))
 
         #TO BE IMPLEMENTED
         #for i in range(len(in_f.corr_runs_v2)):
