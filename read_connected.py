@@ -4,6 +4,18 @@ import numpy as np
 import re
 
 stdoustream = sys.stdout
+
+#Function definitions
+def jacknife(a):
+    mean = np.mean(a, dtype='f8')
+    jack = np.zeros(len(a), dtype='f8')
+    for i in range(len(a)):
+        jack[i] = mean - (a[i] - mean)/(len(a) - 1)
+    
+    return mean, jack
+
+def var_jack(jack):
+    return (len(jack) - 1) * np.var(jack)
 #Class definitions
 #Class of the imput file
 class Input_file:
@@ -93,27 +105,29 @@ class Read_connected:
             self.v1_to_merge.append(s.split('-'))
         
         #Reading weights
+        self.l1_w_config = []
         for i in range(len(in_f.weight_runs)):
-            self.write_log("Reading weight run number " + in_f.corr_runs_v1[i] + ", version 1", self.log)
+            self.write_log("Reading weight run number " + in_f.weight_runs[i], self.log)
             self.l0_w = self.level0_to_read(in_f.weight_runs_path + in_f.weight_runs[i] + "/dat/")
             count = 1
-            self.l1_w_config = []
             for f_to_read in self.l0_w:
-                self.write_log("\tReading level 0 configuration number {}".format(count), self.log)
+                self.write_log("\tReading level 1 configuration number {}".format(count), self.log)
                 count += 1
                 self.l1_w_config.append(self.read_level1_weight(in_f.weight_runs_path + in_f.weight_runs[i] + "/dat/" + f_to_read, endian='little'))
             
         #Reading correlators version 1
+        
         for i in range(len(in_f.corr_runs_v1)):
             self.write_log("Reading run number " + in_f.corr_runs_v1[i] + ", version 1", self.log)
             self.l0_v1 = self.level0_to_read(in_f.corr_runs_path + in_f.corr_runs_v1[i] + "/dat/")
             
-            count = 1
             self.l1_config = []
+            count = 0 
             for f_to_read in self.l0_v1:
-                self.write_log("Reading level 0 configuration number {}".format(count), self.log)
+                self.write_log("Reading level 0 configuration number {}".format(count + 1), self.log)
+                d = self.read_level1_config(in_f.corr_runs_path + in_f.corr_runs_v1[i] + "/dat/" + f_to_read, endian='little', version='V1')
+                self.l1_config.append(self.compute_l1_averages(d, self.l1_w_config[count]))
                 count += 1
-                self.l1_config.append(self.read_level1_config(in_f.corr_runs_path + in_f.corr_runs_v1[i] + "/dat/" + f_to_read, endian='little', version='V1'))
             
             for m in self.v1_to_merge:
                 if m[0] == in_f.corr_runs_v1[i]:
@@ -121,15 +135,17 @@ class Read_connected:
                     self.l0_v2 = self.level0_to_read(in_f.corr_runs_path + m[1] + "/dat/")
                     
                     for f_to_read in self.l0_v2:
-                        self.write_log("Reading level 0 configuration number {}".format(count), self.log)
-                        self.l1_config.append(self.read_level1_config(in_f.corr_runs_path + m[1] + "/dat/" + f_to_read, endian='little', version='V2'))
+                        self.write_log("Reading level 0 configuration number {}".format(count + 1), self.log)
+                        d = self.read_level1_config(in_f.corr_runs_path + m[1] + "/dat/" + f_to_read, endian='little', version='V2')
+                        self.l1_config.append(self.compute_l1_averages(d, self.l1_w_config[count]))
+                        print(self.l1_config[count])
                         count += 1
                     in_f.corr_runs_v2 = np.delete(in_f.corr_runs_v2, np.where(in_f.corr_runs_v2 == m[1]))
                     break
 
         #Reading correlators version 2  
         for i in range(len(in_f.corr_runs_v2)):
-            self.write_log("Reading run number " + in_f.corr_runs_v1[i] + ", version 2", self.log)
+            self.write_log("Reading run number " + in_f.corr_runs_v2[i] + ", version 2", self.log)
             self.l0_v2 = self.level0_to_read(in_f.corr_runs_path + in_f.corr_runs_v2[i] + "/dat/")
 
             count = 1
@@ -137,7 +153,7 @@ class Read_connected:
             for f_to_read in self.l0_v2:
                 self.write_log("Reading level 0 configuration number {}".format(count), self.log)
                 count += 1
-                self.l1_config.append(self.read_level1_config(in_f.corr_runs_path + in_f.corr_runs_v1[i] + "/dat/" + f_to_read, endian='little', version='V2'))
+                self.l1_config.append(self.read_level1_config(in_f.corr_runs_path + in_f.corr_runs_v2[i] + "/dat/" + f_to_read, endian='little', version='V2'))
         self.log.close()
 
     def level0_to_read(self, path: str):
@@ -194,7 +210,7 @@ class Read_connected:
         
                 for src in range(header['n_source']):
                     src_pos[src] = np.fromfile(f, dtype=end + 'i4', count = 4)
-
+                
                 for m in range(header['m0']):
                     for s in range(header['n_source']):
                         counter = 0
@@ -232,7 +248,8 @@ class Read_connected:
                 op_to_read[i] = 1
 
             for c in range(tot_conf):
-                self.write_log("\tReading level 1 config number {}".format(c + 1), self.log)
+                if c % 10 == 0:
+                    self.write_log("\tReading level 1 config numbers {}-{}".format(c, c + 10), self.log)
                 np.fromfile(f, dtype=end + 'i4', count = header['n_slice'])
                 src_pos = np.zeros((header['n_source'], 4))
         
@@ -301,6 +318,20 @@ class Read_connected:
         sys.stdout = f
         print(string, flush=True)
         sys.stdout = stdoustream
+
+    def compute_l1_averages(self, d:Data_conn, w:Data_weight):
+        av_op = np.mean(d.configuration, axis=2, dtype='f8')
+        av_src = np.mean(av_op, axis=1, dtype='f8')
+        dims = av_src.shape
+        
+        av_w = np.mean(w.configuration[0], dtype='f8')
+        
+        corr_reweighted = np.zeros(dims[1])
+        for t in range(dims[1]):
+            av_prod = np.mean(-1.0 * w.configuration[0] * av_src[:, t])
+            corr_reweighted[t] = av_prod/av_w
+        
+        return np.roll(corr_reweighted, -d.y0)
 
 #Execution
 if(len(sys.argv) < 2):
