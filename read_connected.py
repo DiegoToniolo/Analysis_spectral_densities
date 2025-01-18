@@ -48,7 +48,7 @@ class Input_file:
                 print("Second item in merge tuple " + s + " not in version 2 list of runs")
                 exit()
         self.log_file = self.read_setting("log_file")[0]
-
+        self.out_path = self.read_setting("out_path")[0]
     
     def read_setting(self, opt_name: str, dtype='str'):
         self.in_file = open(self.file_path, "r")
@@ -114,9 +114,10 @@ class Read_connected:
                 self.write_log("\tReading level 1 configuration number {}".format(count), self.log)
                 count += 1
                 self.l1_w_config.append(self.read_level1_weight(in_f.weight_runs_path + in_f.weight_runs[i] + "/dat/" + f_to_read, endian='little'))
-            
-        #Reading correlators version 1
-        
+
+        self.averages = []
+        self.jack = []    
+        #Reading correlators version 1 
         for i in range(len(in_f.corr_runs_v1)):
             self.write_log("Reading run number " + in_f.corr_runs_v1[i] + ", version 1", self.log)
             self.l0_v1 = self.level0_to_read(in_f.corr_runs_path + in_f.corr_runs_v1[i] + "/dat/")
@@ -126,7 +127,12 @@ class Read_connected:
             for f_to_read in self.l0_v1:
                 self.write_log("Reading level 0 configuration number {}".format(count + 1), self.log)
                 d = self.read_level1_config(in_f.corr_runs_path + in_f.corr_runs_v1[i] + "/dat/" + f_to_read, endian='little', version='V1')
-                self.l1_config.append(self.compute_l1_averages(d, self.l1_w_config[count]))
+                l1_av = self.compute_l1_averages(d, self.l1_w_config[count])
+                l1_av = np.reshape(l1_av, (1, len(l1_av)))
+                if len(self.l1_config) == 0:
+                    self.l1_config = l1_av
+                else:
+                    self.l1_config = np.append(self.l1_config, l1_av, axis=0)
                 count += 1
             
             for m in self.v1_to_merge:
@@ -137,23 +143,52 @@ class Read_connected:
                     for f_to_read in self.l0_v2:
                         self.write_log("Reading level 0 configuration number {}".format(count + 1), self.log)
                         d = self.read_level1_config(in_f.corr_runs_path + m[1] + "/dat/" + f_to_read, endian='little', version='V2')
-                        self.l1_config.append(self.compute_l1_averages(d, self.l1_w_config[count]))
-                        print(self.l1_config[count])
+                        l1_av = self.compute_l1_averages(d, self.l1_w_config[count])
+                        l1_av = np.reshape(l1_av, (1, len(l1_av)))
+                        if len(self.l1_config) == 0:
+                            self.l1_config = l1_av
+                        else:
+                            self.l1_config = np.append(self.l1_config, l1_av, axis=0)
                         count += 1
                     in_f.corr_runs_v2 = np.delete(in_f.corr_runs_v2, np.where(in_f.corr_runs_v2 == m[1]))
                     break
+            
+            av_run, jack_run = self.compute_l0_averages(self.l1_config)
+            var_run = np.zeros(0, dtype='f8')
+            for t in range(len(jack_run[:, 0])):
+                var_run = np.append(var_run, var_jack(jack_run[t]))
+            self.print_run(av_run, np.sqrt(var_run), in_f.out_path + in_f.corr_runs_v1[i] + ".txt")
 
+            self.averages.append(av_run)
+            self.jack.append(jack_run)
         #Reading correlators version 2  
         for i in range(len(in_f.corr_runs_v2)):
             self.write_log("Reading run number " + in_f.corr_runs_v2[i] + ", version 2", self.log)
             self.l0_v2 = self.level0_to_read(in_f.corr_runs_path + in_f.corr_runs_v2[i] + "/dat/")
 
-            count = 1
+            count = 0
             self.l1_config = []
             for f_to_read in self.l0_v2:
-                self.write_log("Reading level 0 configuration number {}".format(count), self.log)
+                self.write_log("Reading level 0 configuration number {}".format(count + 1), self.log)
+                d = self.read_level1_config(in_f.corr_runs_path + in_f.corr_runs_v2[i] + "/dat/" + f_to_read, endian='little', version='V1')
+                l1_av = self.compute_l1_averages(d, self.l1_w_config[count])
+                l1_av = np.reshape(l1_av, (1, len(l1_av)))
+                if len(self.l1_config) == 0:
+                    self.l1_config = l1_av
+                else:
+                    self.l1_config = np.append(self.l1_config, l1_av, axis=0)
                 count += 1
-                self.l1_config.append(self.read_level1_config(in_f.corr_runs_path + in_f.corr_runs_v2[i] + "/dat/" + f_to_read, endian='little', version='V2'))
+            
+            av_run, jack_run = self.compute_l0_averages(self.l1_config)
+            var_run = np.zeros(0, dtype='f8')
+            for t in len(jack_run[:, 0]):
+                var_run = np.append(var_run, var_jack(jack_run[t]))
+            self.print_run(av_run, np.sqrt(var_run), in_f.out_path + in_f.corr_runs_v2[i] + ".txt")
+
+            self.averages.append(av_run)
+            self.jack.append(jack_run)
+        print(self.averages)
+        print(self.jack)
         self.log.close()
 
     def level0_to_read(self, path: str):
@@ -333,6 +368,32 @@ class Read_connected:
         
         return np.roll(corr_reweighted, -d.y0)
 
+    def compute_l0_averages(self, l1:np.ndarray):
+        #av_l0 = np.mean(l1, axis=0, dtype = 'f8')
+        av_t = np.zeros(0, dtype='f8')
+        n0 = len(l1[:, 0])
+        T = len(l1[0, :])
+        jack_t = np.zeros((0, n0), dtype='f8')
+        for t in range(int(T/2)):
+            mean, jack = jacknife(l1[:, t])
+            if t == 0:
+                av_t = np.append(av_t, mean)
+                jack_t = np.append(jack_t, np.reshape(jack, (1, n0)), axis = 0)
+            else:
+                mean_t_refl, jack_t_refl = jacknife(l1[:, len(l1[0, :]) - t])
+                av_t = np.append(av_t, 0.5*(mean + mean_t_refl))
+                jack_t = np.append(jack_t, np.reshape(0.5*(jack + jack_t_refl), (1, n0)), axis = 0)
+        return av_t, jack_t
+
+    def print_run(self, corr, std_dev_corr, path):
+        f = open(path, "w")
+        
+        sys.stdout = f
+        for i in range(len(corr)):
+            print("{} {}".format(corr[i], std_dev_corr[i]), flush=True)
+        sys.stdout = stdoustream
+        
+        f.close()
 #Execution
 if(len(sys.argv) < 2):
     print("Usage: python3 " + sys.argv[0] + " input_file.in")
