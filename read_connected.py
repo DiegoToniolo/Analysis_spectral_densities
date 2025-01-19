@@ -16,6 +16,10 @@ def jacknife(a):
 
 def var_jack(jack):
     return (len(jack) - 1) * np.var(jack)
+
+def cov_jack(mean1, mean2, jack1, jack2):
+    return (len(jack1) - 1) * np.sum((jack1 - mean1)*(jack2 - mean2))
+
 #Class definitions
 #Class of the imput file
 class Input_file:
@@ -187,8 +191,9 @@ class Read_connected:
 
             self.averages.append(av_run)
             self.jack.append(jack_run)
-        print(self.averages)
-        print(self.jack)
+        
+        all_run_av, all_run_var = self.compute_run_averages(np.array(self.averages), np.array(self.jack))
+        self.print_run(all_run_av, np.sqrt(all_run_var), in_f.out_path + "_total.txt")
         self.log.close()
 
     def level0_to_read(self, path: str):
@@ -394,6 +399,24 @@ class Read_connected:
         sys.stdout = stdoustream
         
         f.close()
+    
+    def compute_run_averages(self, av_l0:np.ndarray, jack_l0:np.ndarray):
+        weights = np.zeros(av_l0.shape, dtype = 'f8')
+        for run in range(len(av_l0[:, 0])):
+            for t in range(len(av_l0[0, :])):
+                weights[run, t] = 1.0/var_jack(jack_l0[run, t])
+
+        av = np.average(av_l0, axis = 0, weights=weights)
+        jack_av = np.zeros((len(av), 0), dtype='f8')
+        for j in range(len(jack_l0[0, 0, :])):
+            jack_av = np.append(jack_av, np.reshape(np.average(jack_l0[:, :, j], axis = 0, weights=weights), (len(av), 1)), axis=1)
+        
+        var = np.zeros(0, dtype='f8')
+        for t in range(len(av)):
+            var = np.append(var, var_jack(jack_av[t]))
+        
+        return av, var
+
 #Execution
 if(len(sys.argv) < 2):
     print("Usage: python3 " + sys.argv[0] + " input_file.in")

@@ -3,7 +3,7 @@ corr_runs_path /home/saccardi/MB-DD-HMC/backup/ms7/F7g/run
 weight_runs_path /home/saccardi/MB-DD-HMC/backup/ms1/F7g/run
 
 [RUN COMPOSITION]
-corr_runs_v1 4
+corr_runs_v1 4 5
 corr_runs_v2 
 weight_runs 1
 to_merge 
