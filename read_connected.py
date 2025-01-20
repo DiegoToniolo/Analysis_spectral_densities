@@ -24,35 +24,36 @@ def cov_jack(mean1, mean2, jack1, jack2):
 #Class of the imput file
 class Input_file:
     def __init__(self, path: str):
-        self.file_path = path
-        self.corr_runs_path = self.read_setting("corr_runs_path")[0]
-        self.weight_runs_path = self.read_setting("weight_runs_path")[0]
-        self.corr_runs_v1 = self.read_setting("corr_runs_v1")
-        self.corr_runs_v2 = self.read_setting("corr_runs_v2")
-        self.weight_runs = self.read_setting("weight_runs")
-        self.operators = self.read_setting("op_to_average", dtype='int')
-        self.n_config_l1 = self.read_setting("l1_configurations_per_slice", dtype='int')
-        self.to_merge = self.read_setting("to_merge")
-        for s in self.to_merge:
-            v1_v2_to_merge = s.split('-')
-            flag = 0
-            for v1 in self.corr_runs_v1:
-                if v1 == v1_v2_to_merge[0]:
-                    flag = 1
-                    break
-            if flag == 0:
-                print("First item in merge tuple " + s + " not in version 1 list of runs")
-                exit(1)
-            flag = 0
-            for v2 in self.corr_runs_v2:
-                if v2 == v1_v2_to_merge[1]:
-                    flag = 1
-                    break
-            if flag == 0:
-                print("Second item in merge tuple " + s + " not in version 2 list of runs")
-                exit()
-        self.log_file = self.read_setting("log_file")[0]
-        self.out_path = self.read_setting("out_path")[0]
+        if path != "":
+            self.file_path = path
+            self.corr_runs_path = self.read_setting("corr_runs_path")[0]
+            self.weight_runs_path = self.read_setting("weight_runs_path")[0]
+            self.corr_runs_v1 = self.read_setting("corr_runs_v1")
+            self.corr_runs_v2 = self.read_setting("corr_runs_v2")
+            self.weight_runs = self.read_setting("weight_runs")
+            self.operators = self.read_setting("op_to_average", dtype='int')
+            self.n_config_l1 = self.read_setting("l1_configurations_per_slice", dtype='int')
+            self.to_merge = self.read_setting("to_merge")
+            for s in self.to_merge:
+                v1_v2_to_merge = s.split('-')
+                flag = 0
+                for v1 in self.corr_runs_v1:
+                    if v1 == v1_v2_to_merge[0]:
+                        flag = 1
+                        break
+                if flag == 0:
+                    print("First item in merge tuple " + s + " not in version 1 list of runs")
+                    exit(1)
+                flag = 0
+                for v2 in self.corr_runs_v2:
+                    if v2 == v1_v2_to_merge[1]:
+                        flag = 1
+                        break
+                if flag == 0:
+                    print("Second item in merge tuple " + s + " not in version 2 list of runs")
+                    exit()
+            self.log_file = self.read_setting("log_file")[0]
+            self.out_path = self.read_setting("out_path")[0]
     
     def read_setting(self, opt_name: str, dtype='str'):
         self.in_file = open(self.file_path, "r")
@@ -100,38 +101,35 @@ class Data_weight:
 #Class to read all the data and to perform the needed averages.       
 class Read_connected:
     def __init__(self,  in_f: Input_file):
-        self.op = in_f.operators
-        self.n_l1 = in_f.n_config_l1
-        self.log = open(in_f.log_file, 'w')
-        
+        log = open(in_f.log_file, 'w')
+
         self.v1_to_merge = []
         for s in in_f.to_merge:
             self.v1_to_merge.append(s.split('-'))
         
         #Reading weights
-        self.l1_w_config = []
+        l1_w_config = []
         for i in range(len(in_f.weight_runs)):
-            self.write_log("Reading weight run number " + in_f.weight_runs[i], self.log)
+            self.write_log("Reading weight run number " + in_f.weight_runs[i], log)
             self.l0_w = self.level0_to_read(in_f.weight_runs_path + in_f.weight_runs[i] + "/dat/")
             count = 1
             for f_to_read in self.l0_w:
-                self.write_log("\tReading level 1 configuration number {}".format(count), self.log)
                 count += 1
-                self.l1_w_config.append(self.read_level1_weight(in_f.weight_runs_path + in_f.weight_runs[i] + "/dat/" + f_to_read, endian='little'))
+                l1_w_config.append(self.read_level1_weight(in_f.weight_runs_path + in_f.weight_runs[i] + "/dat/" + f_to_read, endian='little', in_f=in_f))
 
         self.averages = []
         self.jack = []    
         #Reading correlators version 1 
         for i in range(len(in_f.corr_runs_v1)):
-            self.write_log("Reading run number " + in_f.corr_runs_v1[i] + ", version 1", self.log)
+            self.write_log("Reading run number " + in_f.corr_runs_v1[i] + ", version 1", log)
             self.l0_v1 = self.level0_to_read(in_f.corr_runs_path + in_f.corr_runs_v1[i] + "/dat/")
             
             self.l1_config = []
             count = 0 
             for f_to_read in self.l0_v1:
-                self.write_log("Reading level 0 configuration number {}".format(count + 1), self.log)
-                d = self.read_level1_config(in_f.corr_runs_path + in_f.corr_runs_v1[i] + "/dat/" + f_to_read, endian='little', version='V1')
-                l1_av = self.compute_l1_averages(d, self.l1_w_config[count])
+                self.write_log("\tReading level 0 configuration number {}".format(count + 1), log)
+                d = self.read_level1_config(in_f.corr_runs_path + in_f.corr_runs_v1[i] + "/dat/" + f_to_read, endian='little', version='V1', in_f=in_f)
+                l1_av = self.compute_l1_averages(d, l1_w_config[count])
                 l1_av = np.reshape(l1_av, (1, len(l1_av)))
                 if len(self.l1_config) == 0:
                     self.l1_config = l1_av
@@ -141,13 +139,13 @@ class Read_connected:
             
             for m in self.v1_to_merge:
                 if m[0] == in_f.corr_runs_v1[i]:
-                    self.write_log("Merging to " + m[1], self.log)
+                    self.write_log("Merging to " + m[1], log)
                     self.l0_v2 = self.level0_to_read(in_f.corr_runs_path + m[1] + "/dat/")
                     
                     for f_to_read in self.l0_v2:
-                        self.write_log("Reading level 0 configuration number {}".format(count + 1), self.log)
-                        d = self.read_level1_config(in_f.corr_runs_path + m[1] + "/dat/" + f_to_read, endian='little', version='V2')
-                        l1_av = self.compute_l1_averages(d, self.l1_w_config[count])
+                        self.write_log("\tReading level 0 configuration number {}".format(count + 1), log)
+                        d = self.read_level1_config(in_f.corr_runs_path + m[1] + "/dat/" + f_to_read, endian='little', version='V2', in_f=in_f)
+                        l1_av = self.compute_l1_averages(d, l1_w_config[count])
                         l1_av = np.reshape(l1_av, (1, len(l1_av)))
                         if len(self.l1_config) == 0:
                             self.l1_config = l1_av
@@ -167,15 +165,15 @@ class Read_connected:
             self.jack.append(jack_run)
         #Reading correlators version 2  
         for i in range(len(in_f.corr_runs_v2)):
-            self.write_log("Reading run number " + in_f.corr_runs_v2[i] + ", version 2", self.log)
+            self.write_log("Reading run number " + in_f.corr_runs_v2[i] + ", version 2", log)
             self.l0_v2 = self.level0_to_read(in_f.corr_runs_path + in_f.corr_runs_v2[i] + "/dat/")
 
             count = 0
             self.l1_config = []
             for f_to_read in self.l0_v2:
-                self.write_log("Reading level 0 configuration number {}".format(count + 1), self.log)
-                d = self.read_level1_config(in_f.corr_runs_path + in_f.corr_runs_v2[i] + "/dat/" + f_to_read, endian='little', version='V1')
-                l1_av = self.compute_l1_averages(d, self.l1_w_config[count])
+                self.write_log("\tReading level 0 configuration number {}".format(count + 1), log)
+                d = self.read_level1_config(in_f.corr_runs_path + in_f.corr_runs_v2[i] + "/dat/" + f_to_read, endian='little', version='V2', in_f=in_f)
+                l1_av = self.compute_l1_averages(d, l1_w_config[count])
                 l1_av = np.reshape(l1_av, (1, len(l1_av)))
                 if len(self.l1_config) == 0:
                     self.l1_config = l1_av
@@ -194,7 +192,7 @@ class Read_connected:
         
         all_run_av, all_run_var = self.compute_run_averages(np.array(self.averages), np.array(self.jack))
         self.print_run(all_run_av, np.sqrt(all_run_var), in_f.out_path + "_total.txt")
-        self.log.close()
+        log.close()
 
     def level0_to_read(self, path: str):
         cmd_cd = ['ls', path]
@@ -214,7 +212,7 @@ class Read_connected:
 
         return runs_to_read
         
-    def read_level1_config(self, file_path: str, endian:str='little', version:str='V1') -> Data_conn:
+    def read_level1_config(self, file_path: str, endian:str='little', version:str='V1', in_f:Input_file=Input_file("")) -> Data_conn:
         if endian == 'little':
             end = '<'
         elif endian == 'big':
@@ -231,20 +229,18 @@ class Read_connected:
             tmp = np.fromfile(f, dtype=end + 'i4', count = 5)
             header = {'m0': tmp[0], 'n_source': tmp[1], 'n_op': tmp[2], 't_max': tmp[3], 'n_slice': 2}
         
-            if len(self.n_l1) != header['n_slice']:
+            if len(in_f.n_config_l1) != header['n_slice']:
                 print("Number of level 1 configurations not correct")
                 exit(1)
         
-            tot_conf = np.prod(self.n_l1)
+            tot_conf = np.prod(in_f.n_config_l1)
             #Reading configurations
-            data.set_dims(tot_conf, header['n_source'], len(self.op), header['t_max'])
+            data.set_dims(tot_conf, header['n_source'], len(in_f.operators), header['t_max'])
             op_to_read = np.zeros(header['n_op'])
-            for i in self.op:
+            for i in in_f.operators:
                 op_to_read[i] = 1
 
             for c in range(tot_conf):
-                if c % 10 == 0:
-                    self.write_log("\tReading level 1 config numbers {}-{}".format(c, c + 10), self.log)
                 np.fromfile(f, dtype=end + 'i4', count = header['n_slice'])
                 src_pos = np.zeros((header['n_source'], 4))
         
@@ -274,22 +270,20 @@ class Read_connected:
             tmp = np.fromfile(f, dtype=end + 'i4', count = 5)
             header = {'m0': tmp[0], 'n_source': tmp[1], 'n_op': tmp[2], 't_max': tmp[3], 'n_slice': 2}
         
-            if len(self.n_l1) != header['n_slice']:
+            if len(in_f.n_config_l1) != header['n_slice']:
                 print("Number of level 1 configurations not correct")
                 exit(1)
 
-            tot_conf = np.prod(self.n_l1)
+            tot_conf = np.prod(in_f.n_config_l1)
 
             #Reading configurations
-            data.set_dims(tot_conf, header['n_source'], len(self.op), header['t_max'])
+            data.set_dims(tot_conf, header['n_source'], len(in_f.operators), header['t_max'])
             
             op_to_read = np.zeros(header['n_op'] + 4)
-            for i in self.op:
+            for i in in_f.operators:
                 op_to_read[i] = 1
 
             for c in range(tot_conf):
-                if c % 10 == 0:
-                    self.write_log("\tReading level 1 config numbers {}-{}".format(c, c + 10), self.log)
                 np.fromfile(f, dtype=end + 'i4', count = header['n_slice'])
                 src_pos = np.zeros((header['n_source'], 4))
         
@@ -314,7 +308,7 @@ class Read_connected:
         return data
         f.close()
 
-    def read_level1_weight(self, file_path: str, endian:str='little') -> Data_weight:
+    def read_level1_weight(self, file_path: str, endian:str='little', in_f:Input_file=Input_file("")) -> Data_weight:
         if endian == 'little':
             end = '<'
         elif endian == 'big':
@@ -330,11 +324,11 @@ class Read_connected:
         n_rw, n_slice = tmp[0], tmp[1]
         n_fct, n_src = np.fromfile(f, dtype=end + 'i4', count = n_rw), np.fromfile(f, dtype=end + 'i4', count = n_rw)
 
-        if len(self.n_l1) != n_slice:
+        if len(in_f.n_config_l1) != n_slice:
             print("Number of level 1 configurations not correct")
             exit(1)
         
-        tot_conf = np.prod(self.n_l1)
+        tot_conf = np.prod(in_f.n_config_l1)
         data = Data_weight(n_rw, tot_conf)
         for c in range(tot_conf):
             np.fromfile(f, dtype=end + 'i4', count = n_slice)

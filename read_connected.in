@@ -3,10 +3,10 @@ corr_runs_path /home/saccardi/MB-DD-HMC/backup/ms7/F7g/run
 weight_runs_path /home/saccardi/MB-DD-HMC/backup/ms1/F7g/run
 
 [RUN COMPOSITION]
-corr_runs_v1 4 5
-corr_runs_v2 
+corr_runs_v1 3 4 5 6 7 8 9 10 12 13 14 15 16 18 19
+corr_runs_v2 3_marenostrum
 weight_runs 1
-to_merge 
+to_merge 3-3_marenostrum
 
 [LATTICE]
 l1_configurations_per_slice 10 10
