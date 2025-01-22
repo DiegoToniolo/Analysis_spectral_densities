@@ -126,12 +126,13 @@ class Jacknife:
             return quo
 #Class for the structure of the unweighted correlators
 class Data_conn:
-    def __init__(self, n_c:int = 0, n_src:int = 0, n_op:int = 0, n_t:int = 0, y0:int = 0):
-        self.set_dims(n_c, n_src, n_op, n_t)
+    def __init__(self, n_c:int = 0, n_src:int = 0, n_op:int = 0, n_t:int = 0, n_sl:int = 0, y0:int = 0):
+        self.set_dims(n_c, n_src, n_op, n_t, n_sl)
         self.set_y0(y0)
 
-    def set_dims(self, n_c:int = 0, n_src:int = 0, n_op:int = 0, n_t:int = 0):
+    def set_dims(self, n_c:int = 0, n_src:int = 0, n_op:int = 0, n_t:int = 0, n_sl:int = 0):
         self.configuration = np.zeros((n_c, n_src, n_op, n_t), dtype='f8')
+        self.id_conf = np.zeros((n_c, n_sl), dtype='i4')
 
     def set_y0(self, y0:int=0):
         self.y0 = y0
@@ -166,15 +167,18 @@ class Read_connected:
 
         self.averages = []
         self.jack = []    
+        
         #Reading correlators version 1 
         for i in range(len(in_f.corr_runs_v1)):
             self.write_log("Reading run number " + in_f.corr_runs_v1[i] + ", version 1", log)
-            self.l0_v1 = self.level0_to_read(in_f.corr_runs_path + in_f.corr_runs_v1[i] + "/dat/")
+            
+            l0_files = self.level0_to_read(in_f.corr_runs_path + in_f.corr_runs_v1[i] + "/dat/")
             
             self.l1_config = []
             count = 0 
-            for f_to_read in self.l0_v1:
+            for f_to_read in l0_files:
                 self.write_log("\tReading level 0 configuration number {}".format(count + 1), log)
+                
                 d = self.read_level1_config(in_f.corr_runs_path + in_f.corr_runs_v1[i] + "/dat/" + f_to_read, endian='little', version='V1', in_f=in_f)
                 l1_av = self.compute_l1_averages(d, l1_w_config[count])
                 l1_av = np.reshape(l1_av, (1, len(l1_av)))
@@ -266,32 +270,32 @@ class Read_connected:
         elif endian == 'big':
             end = '>'
         else:
-            sys.stdout = self.outstream
             print("Wrong specification of endianness")
             exit(1)
         
         f = open(file_path, "rb")
-        data = Data_conn()
+
+        #Reading header
+        tmp = np.fromfile(f, dtype=end + 'i4', count = 5)
+        header = {'m0': tmp[0], 'n_source': tmp[1], 'n_op': tmp[2], 't_max': tmp[3], 'n_slice': tmp[4]}
+        
+        if len(in_f.n_config_l1) != header['n_slice']:
+            print("Number of level 1 configurations not correct")
+            exit(1)
+        
+        tot_conf = np.prod(in_f.n_config_l1)
+        #Reading configurations
+        data = Data_conn(tot_conf, header['n_source'], len(in_f.operators), header['t_max'], header['n_slice'])
+        
         if version == 'V1':
-            #Reading header
-            tmp = np.fromfile(f, dtype=end + 'i4', count = 5)
-            header = {'m0': tmp[0], 'n_source': tmp[1], 'n_op': tmp[2], 't_max': tmp[3], 'n_slice': 2}
-        
-            if len(in_f.n_config_l1) != header['n_slice']:
-                print("Number of level 1 configurations not correct")
-                exit(1)
-        
-            tot_conf = np.prod(in_f.n_config_l1)
-            #Reading configurations
-            data.set_dims(tot_conf, header['n_source'], len(in_f.operators), header['t_max'])
             op_to_read = np.zeros(header['n_op'])
             for i in in_f.operators:
                 op_to_read[i] = 1
 
             for c in range(tot_conf):
-                np.fromfile(f, dtype=end + 'i4', count = header['n_slice'])
+                data.id_conf[c] = np.fromfile(f, dtype=end + 'i4', count = header['n_slice'])/int(4)
+                
                 src_pos = np.zeros((header['n_source'], 4))
-        
                 for src in range(header['n_source']):
                     src_pos[src] = np.fromfile(f, dtype=end + 'i4', count = 4)
                 
@@ -312,29 +316,16 @@ class Read_connected:
                         for op in range(4):
                             for t in range(header['t_max']):
                                 np.fromfile(f, dtype=end + 'f8', count = 2)
-            data.set_y0(int(src_pos[0][0]))
-        elif version == 'V2':
-            #Reading header
-            tmp = np.fromfile(f, dtype=end + 'i4', count = 5)
-            header = {'m0': tmp[0], 'n_source': tmp[1], 'n_op': tmp[2], 't_max': tmp[3], 'n_slice': 2}
         
-            if len(in_f.n_config_l1) != header['n_slice']:
-                print("Number of level 1 configurations not correct")
-                exit(1)
-
-            tot_conf = np.prod(in_f.n_config_l1)
-
-            #Reading configurations
-            data.set_dims(tot_conf, header['n_source'], len(in_f.operators), header['t_max'])
-            
+        elif version == 'V2':
             op_to_read = np.zeros(header['n_op'] + 4)
             for i in in_f.operators:
                 op_to_read[i] = 1
 
             for c in range(tot_conf):
-                np.fromfile(f, dtype=end + 'i4', count = header['n_slice'])
+                data.id_conf[c] = np.fromfile(f, dtype=end + 'i4', count = header['n_slice'])/int(4)
+                
                 src_pos = np.zeros((header['n_source'], 4))
-        
                 for src in range(header['n_source']):
                     src_pos[src] = np.fromfile(f, dtype=end + 'i4', count = 4)
 
@@ -349,12 +340,12 @@ class Read_connected:
                             else:
                                 for t in range(header['t_max']):
                                     np.fromfile(f, dtype=end + 'f8', count = 2)
-            data.set_y0(int(src_pos[0][0]))
         else:
             print("Wrong version number")
             exit(1)
-        return data
+        data.set_y0(int(src_pos[0][0]))
         f.close()
+        return data
 
     def read_level1_weight(self, file_path: str, endian:str='little', in_f:Input_file=Input_file("")) -> Data_weight:
         if endian == 'little':
