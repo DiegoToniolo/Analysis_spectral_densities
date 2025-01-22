@@ -6,13 +6,7 @@ import re
 stdoustream = sys.stdout
 
 #Function definitions
-def jacknife(a):
-    mean = np.mean(a, dtype='f8')
-    jack = np.zeros(len(a), dtype='f8')
-    for i in range(len(a)):
-        jack[i] = mean - (a[i] - mean)/(len(a) - 1)
-    
-    return mean, jack
+
 
 def var_jack(jack):
     return (len(jack) - 1) * np.var(jack)
@@ -78,6 +72,67 @@ class Input_file:
         else:
             return tokens
 
+#Class of jacknife variables
+class Jacknife:
+    def __init__(self, data:np.ndarray=np.array([0, 0])):
+        self.mean, self.jack = self.jacknife(data)
+    
+    def jacknife(self, a):
+        mean = np.mean(a, dtype='f8')
+        jack = np.zeros(len(a), dtype='f8')
+        for i in range(len(a)):
+            jack[i] = mean - (a[i] - mean)/(len(a) - 1)
+    
+        return mean, jack
+    
+    def variance(self):
+        return (len(self.jack) - 1) * np.var(self.jack)
+    
+    def iscompatible(self, var):
+        if not isinstance(var, Jacknife):
+            print("Non compatible types: Jacknife + " + str(type(var)))
+            return False
+        elif len(self.jack) != len(var.jack):
+            print("Jacknife vectors have not equal length: {} and {}".format(len(self.jack), len(var.jack)))
+            return False
+        else:
+            return True
+
+    def __add__(self, var):
+        if not self.iscompatible(var):
+            exit(1)
+        else:
+            sum = Jacknife()
+            sum.mean = self.mean + var.mean
+            sum.jack = self.jack + var.jack
+            return sum
+    
+    def __sub__(self, var):
+        if not self.iscompatible(var):
+            exit(1)
+        else:
+            diff = Jacknife()
+            diff.mean = self.mean - var.mean
+            diff.jack = self.jack - var.jack
+            return diff
+    
+    def __mul__(self, var):
+        if not self.iscompatible(var):
+            exit(1)
+        else:
+            prod = Jacknife()
+            prod.mean = self.mean * var.mean
+            prod.jack = self.jack * var.jack
+            return prod
+        
+    def __truediv__(self, var):
+        if not self.iscompatible(var):
+            exit(1)
+        else:
+            quo = Jacknife()
+            quo.mean = self.mean / var.mean
+            quo.jack = self.jack / var.jack
+            return quo
 #Class for the structure of the unweighted correlators
 class Data_conn:
     def __init__(self, n_c:int = 0, n_src:int = 0, n_op:int = 0, n_t:int = 0, y0:int = 0):
@@ -156,6 +211,7 @@ class Read_connected:
                     break
             
             av_run, jack_run = self.compute_l0_averages(self.l1_config)
+            self.print_prefolding(self.l1_config, in_f.out_path + in_f.corr_runs_v1[i] + "_prefolding.txt")
             var_run = np.zeros(0, dtype='f8')
             for t in range(len(jack_run[:, 0])):
                 var_run = np.append(var_run, var_jack(jack_run[t]))
@@ -368,7 +424,6 @@ class Read_connected:
         return np.roll(corr_reweighted, -d.y0)
 
     def compute_l0_averages(self, l1:np.ndarray):
-        #av_l0 = np.mean(l1, axis=0, dtype = 'f8')
         av_t = np.zeros(0, dtype='f8')
         n0 = len(l1[:, 0])
         T = len(l1[0, :])
@@ -379,7 +434,7 @@ class Read_connected:
                 av_t = np.append(av_t, mean)
                 jack_t = np.append(jack_t, np.reshape(jack, (1, n0)), axis = 0)
             else:
-                mean_t_refl, jack_t_refl = jacknife(l1[:, len(l1[0, :]) - t])
+                mean_t_refl, jack_t_refl = jacknife(l1[:, T - t])
                 av_t = np.append(av_t, 0.5*(mean + mean_t_refl))
                 jack_t = np.append(jack_t, np.reshape(0.5*(jack + jack_t_refl), (1, n0)), axis = 0)
         return av_t, jack_t
@@ -394,6 +449,18 @@ class Read_connected:
         
         f.close()
     
+    def print_prefolding(self, l1:np.ndarray, path:str):
+        f = open(path, "w")
+        
+        sys.stdout = f
+        T = len(l1[0, :])
+        for t in range(int(T)):
+            mean, jack = jacknife(l1[:, t])
+            print(f"{mean} {np.sqrt(var_jack(jack))}")
+        sys.stdout = stdoustream
+        
+        f.close()
+
     def compute_run_averages(self, av_l0:np.ndarray, jack_l0:np.ndarray):
         weights = np.zeros(av_l0.shape, dtype = 'f8')
         for run in range(len(av_l0[:, 0])):
