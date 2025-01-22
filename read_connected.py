@@ -5,15 +5,6 @@ import re
 
 stdoustream = sys.stdout
 
-#Function definitions
-
-
-def var_jack(jack):
-    return (len(jack) - 1) * np.var(jack)
-
-def cov_jack(mean1, mean2, jack1, jack2):
-    return (len(jack1) - 1) * np.sum((jack1 - mean1)*(jack2 - mean2))
-
 #Class definitions
 #Class of the imput file
 class Input_file:
@@ -147,10 +138,11 @@ class Data_conn:
 
 #Class for the structure of the reweighting    
 class Data_weight:
-    def __init__(self, n_rw:int = 0, n_c:int = 0):
-        self.set_dims(n_rw, n_c)
+    def __init__(self, n_rw:int = 0, n_c:int = 0, n_sl:int = 0):
+        self.set_dims(n_rw, n_c, n_sl)
     
-    def set_dims(self, n_rw:int, n_c:int):
+    def set_dims(self, n_rw:int, n_c:int, n_sl:int):
+        self.id_conf = np.zeros((n_c, n_sl), dtype='i4')
         self.configuration = np.zeros((n_rw, n_c))
 
 #Class to read all the data and to perform the needed averages.       
@@ -158,18 +150,18 @@ class Read_connected:
     def __init__(self,  in_f: Input_file):
         log = open(in_f.log_file, 'w')
 
-        self.v1_to_merge = []
+        v1_to_merge = []
         for s in in_f.to_merge:
-            self.v1_to_merge.append(s.split('-'))
+            v1_to_merge.append(s.split('-'))
         
         #Reading weights
         l1_w_config = []
         for i in range(len(in_f.weight_runs)):
             self.write_log("Reading weight run number " + in_f.weight_runs[i], log)
-            self.l0_w = self.level0_to_read(in_f.weight_runs_path + in_f.weight_runs[i] + "/dat/")
-            count = 1
-            for f_to_read in self.l0_w:
-                count += 1
+            
+            l0_files = self.level0_to_read(in_f.weight_runs_path + in_f.weight_runs[i] + "/dat/")
+            
+            for f_to_read in l0_files:
                 l1_w_config.append(self.read_level1_weight(in_f.weight_runs_path + in_f.weight_runs[i] + "/dat/" + f_to_read, endian='little', in_f=in_f))
 
         self.averages = []
@@ -370,7 +362,6 @@ class Read_connected:
         elif endian == 'big':
             end = '>'
         else:
-            sys.stdout = self.outstream
             print("Wrong specification of endianness")
             exit(1)
         
@@ -385,9 +376,9 @@ class Read_connected:
             exit(1)
         
         tot_conf = np.prod(in_f.n_config_l1)
-        data = Data_weight(n_rw, tot_conf)
+        data = Data_weight(n_rw, tot_conf, n_slice)
         for c in range(tot_conf):
-            np.fromfile(f, dtype=end + 'i4', count = n_slice)
+            data.id_conf[c] = np.fromfile(f, dtype=end + 'i4', count = n_slice)/int(4)
             for rw in range(n_rw):
                 for fct in range(n_fct[rw]):
                     for src in range(n_src[rw]):
@@ -398,12 +389,11 @@ class Read_connected:
                     tmp2 = np.zeros(n_src[rw])
                     for src in range(n_src[rw]):
                         tmp2[src] = np.fromfile(f, dtype=end + 'f8', count = 1)[0] + 437.0
-                    #print(tmp2)
                     tmp1[fct] = np.mean(np.exp(-tmp2))
                 data.configuration[rw][c] = np.prod(tmp1)
-        return data
         f.close()
-
+        return data
+        
     def write_log(self, string:'str', f):
         sys.stdout = f
         print(string, flush=True)
