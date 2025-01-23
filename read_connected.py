@@ -39,6 +39,8 @@ class Input_file:
                     exit()
             self.log_file = self.read_setting("log_file")[0]
             self.out_path = self.read_setting("out_path")[0]
+            self.std_av = self.read_setting("std_av")
+            self.ml_av = self.read_setting("ml_av")
     
     def read_setting(self, opt_name: str, dtype='str'):
         self.in_file = open(self.file_path, "r")
@@ -124,6 +126,7 @@ class Jacknife:
             quo.mean = self.mean / var.mean
             quo.jack = self.jack / var.jack
             return quo
+
 #Class for the structure of the unweighted correlators
 class Data_conn:
     def __init__(self, n_c:int = 0, n_src:int = 0, n_op:int = 0, n_t:int = 0, n_sl:int = 0, y0:int = 0):
@@ -139,12 +142,11 @@ class Data_conn:
 
 #Class for the structure of the reweighting    
 class Data_weight:
-    def __init__(self, n_rw:int = 0, n_c:int = 0, n_sl:int = 0):
-        self.set_dims(n_rw, n_c, n_sl)
+    def __init__(self, n_rw:int = 0, n_sl:tuple = (0)):
+        self.set_dims(n_rw, n_sl)
     
-    def set_dims(self, n_rw:int, n_c:int, n_sl:int):
-        self.id_conf = np.zeros((n_c, n_sl), dtype='i4')
-        self.configuration = np.zeros((n_rw, n_c))
+    def set_dims(self, n_rw:int, n_sl:np.ndarray) -> None:
+        self.configuration = np.zeros(tuple([n_rw]) + n_sl)
 
 #Class to read all the data and to perform the needed averages.       
 class Read_connected:
@@ -174,13 +176,13 @@ class Read_connected:
             
             l0_files = self.level0_to_read(in_f.corr_runs_path + in_f.corr_runs_v1[i] + "/dat/")
             
-            self.l1_config = []
+            l1_config = []
             count = 0 
             for f_to_read in l0_files:
                 self.write_log("\tReading level 0 configuration number {}".format(count + 1), log)
-                
+
                 d = self.read_level1_config(in_f.corr_runs_path + in_f.corr_runs_v1[i] + "/dat/" + f_to_read, endian='little', version='V1', in_f=in_f)
-                l1_av = self.compute_l1_averages(d, l1_w_config[count])
+                self.l1_averages_prod(d, l1_w_config[count], in_f)
                 l1_av = np.reshape(l1_av, (1, len(l1_av)))
                 if len(self.l1_config) == 0:
                     self.l1_config = l1_av
@@ -367,9 +369,9 @@ class Read_connected:
             exit(1)
         
         tot_conf = np.prod(in_f.n_config_l1)
-        data = Data_weight(n_rw, tot_conf, n_slice)
+        data = Data_weight(n_rw, tuple(in_f.n_config_l1))
         for c in range(tot_conf):
-            data.id_conf[c] = np.fromfile(f, dtype=end + 'i4', count = n_slice)/int(4)
+            id_conf = np.array(np.fromfile(f, dtype=end + 'i4', count = n_slice)/int(4) - 1, dtype=int)
             for rw in range(n_rw):
                 for fct in range(n_fct[rw]):
                     for src in range(n_src[rw]):
@@ -381,7 +383,7 @@ class Read_connected:
                     for src in range(n_src[rw]):
                         tmp2[src] = np.fromfile(f, dtype=end + 'f8', count = 1)[0] + 437.0
                     tmp1[fct] = np.mean(np.exp(-tmp2))
-                data.configuration[rw][c] = np.prod(tmp1)
+                data.configuration[rw, tuple(id_conf)] = np.prod(tmp1)
         f.close()
         return data
         
@@ -390,19 +392,16 @@ class Read_connected:
         print(string, flush=True)
         sys.stdout = stdoustream
 
-    def compute_l1_averages(self, d:Data_conn, w:Data_weight):
+    def l1_averages_prod(self, d:Data_conn, w:Data_weight, f:Input_file):
         av_op = np.mean(d.configuration, axis=2, dtype='f8')
         av_src = np.mean(av_op, axis=1, dtype='f8')
         dims = av_src.shape
         
-        av_w = np.mean(w.configuration[0], dtype='f8')
-        
-        corr_reweighted = np.zeros(dims[1])
-        for t in range(dims[1]):
-            av_prod = np.mean(-1.0 * w.configuration[0] * av_src[:, t])
-            corr_reweighted[t] = av_prod/av_w
-        
-        return np.roll(corr_reweighted, -d.y0)
+        #Standard average
+        #for sc in in_f.std_av:
+        #    for to_select in sc.split('-'):
+        #        for c in range(dims[0]):
+        #            if d.id_conf[c]
 
     def compute_l0_averages(self, l1:np.ndarray):
         av_t = np.zeros(0, dtype='f8')

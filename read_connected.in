@@ -10,6 +10,8 @@ to_merge
 
 [LATTICE]
 l1_configurations_per_slice 10 10
+std_av 1-5-10
+ml_av 1-5-10
 
 [OPERATORS]
 op_to_average 2 3 4
