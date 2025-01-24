@@ -129,24 +129,23 @@ class Jacknife:
 
 #Class for the structure of the unweighted correlators
 class Data_conn:
-    def __init__(self, n_c:int = 0, n_src:int = 0, n_op:int = 0, n_t:int = 0, n_sl:int = 0, y0:int = 0):
-        self.set_dims(n_c, n_src, n_op, n_t, n_sl)
+    def __init__(self, n_src:int = 0, n_op:int = 0, n_t:int = 0, sl:tuple = (0), y0:int = 0):
+        self.set_dims(n_src, n_op, n_t, sl)
         self.set_y0(y0)
 
-    def set_dims(self, n_c:int = 0, n_src:int = 0, n_op:int = 0, n_t:int = 0, n_sl:int = 0):
-        self.configuration = np.zeros((n_c, n_src, n_op, n_t), dtype='f8')
-        self.id_conf = np.zeros((n_c, n_sl), dtype='i4')
+    def set_dims(self, n_src:int, n_op:int, n_t:int, sl:tuple):
+        self.configuration = np.zeros(sl + tuple([n_src, n_op, n_t]), dtype='f8')
 
     def set_y0(self, y0:int=0):
         self.y0 = y0
 
 #Class for the structure of the reweighting    
 class Data_weight:
-    def __init__(self, n_rw:int = 0, n_sl:tuple = (0)):
-        self.set_dims(n_rw, n_sl)
+    def __init__(self, n_rw:int = 0, sl:tuple = (0)):
+        self.set_dims(n_rw, sl)
     
-    def set_dims(self, n_rw:int, n_sl:np.ndarray) -> None:
-        self.configuration = np.zeros(tuple([n_rw]) + n_sl)
+    def set_dims(self, n_rw:int, sl:np.ndarray) -> None:
+        self.configuration = np.zeros(tuple([n_rw]) + sl)
 
 #Class to read all the data and to perform the needed averages.       
 class Read_connected:
@@ -287,16 +286,15 @@ class Read_connected:
         
         tot_conf = np.prod(in_f.n_config_l1)
         #Reading configurations
-        data = Data_conn(tot_conf, header['n_source'], len(in_f.operators), header['t_max'], header['n_slice'])
-        
+        data = Data_conn(header['n_source'], len(in_f.operators), header['t_max'], tuple(in_f.n_config_l1))
         if version == 'V1':
             op_to_read = np.zeros(header['n_op'])
             for i in in_f.operators:
                 op_to_read[i] = 1
 
             for c in range(tot_conf):
-                data.id_conf[c] = np.fromfile(f, dtype=end + 'i4', count = header['n_slice'])/int(4)
-                
+                id_conf = np.array(np.fromfile(f, dtype=end + 'i4', count = header['n_slice'])/int(4) - 1, dtype=int)
+
                 src_pos = np.zeros((header['n_source'], 4))
                 for src in range(header['n_source']):
                     src_pos[src] = np.fromfile(f, dtype=end + 'i4', count = 4)
@@ -307,7 +305,8 @@ class Read_connected:
                         for op in range(header['n_op']):
                             if op_to_read[op] == 1:
                                 for t in range(header['t_max']):
-                                    data.configuration[c][s][counter][t] = np.fromfile(f, dtype=end + 'f8', count = 2)[0]
+                                    index = tuple(id_conf) +  tuple([s, counter, t])
+                                    data.configuration[index] = np.fromfile(f, dtype=end + 'f8', count = 2)[0]
                                 counter += 1
                             else:
                                 for t in range(header['t_max']):
@@ -325,8 +324,8 @@ class Read_connected:
                 op_to_read[i] = 1
 
             for c in range(tot_conf):
-                data.id_conf[c] = np.fromfile(f, dtype=end + 'i4', count = header['n_slice'])/int(4)
-                
+                id_conf = np.array(np.fromfile(f, dtype=end + 'i4', count = header['n_slice'])/int(4) - 1, dtype=int)
+
                 src_pos = np.zeros((header['n_source'], 4))
                 for src in range(header['n_source']):
                     src_pos[src] = np.fromfile(f, dtype=end + 'i4', count = 4)
@@ -337,7 +336,8 @@ class Read_connected:
                         for op in range(header['n_op'] + 4):
                             if op_to_read[op] == 1:
                                 for t in range(header['t_max']):
-                                    data.configuration[c][s][counter][t] = np.fromfile(f, dtype=end + 'f8', count = 2)[0]
+                                    index = tuple(id_conf) +  tuple([s, counter, t])
+                                    data.configuration[index] = np.fromfile(f, dtype=end + 'f8', count = 2)[0]
                                 counter += 1
                             else:
                                 for t in range(header['t_max']):
@@ -383,7 +383,8 @@ class Read_connected:
                     for src in range(n_src[rw]):
                         tmp2[src] = np.fromfile(f, dtype=end + 'f8', count = 1)[0] + 437.0
                     tmp1[fct] = np.mean(np.exp(-tmp2))
-                data.configuration[rw, tuple(id_conf)] = np.prod(tmp1)
+                index = tuple([rw]) + tuple(id_conf)
+                data.configuration[index] = np.prod(tmp1)
         f.close()
         return data
         
