@@ -18,12 +18,13 @@ class Input_file:
             self.weight_runs = self.read_setting("weight_runs")
             self.operators = self.read_setting("op_to_average", dtype='int')
             self.n_config_l1 = self.read_setting("l1_configurations_per_slice", dtype='int')
-            self.to_merge = self.read_setting("to_merge")
-            for s in self.to_merge:
-                v1_v2_to_merge = s.split('-')
+            to_merge = self.read_setting("to_merge")
+            self.v1_v2_to_merge = []
+            for s in to_merge:
+                spl = s.split('-')
                 flag = 0
                 for v1 in self.corr_runs_v1:
-                    if v1 == v1_v2_to_merge[0]:
+                    if v1 == spl[0]:
                         flag = 1
                         break
                 if flag == 0:
@@ -31,17 +32,22 @@ class Input_file:
                     exit(1)
                 flag = 0
                 for v2 in self.corr_runs_v2:
-                    if v2 == v1_v2_to_merge[1]:
+                    if v2 == spl[1]:
                         flag = 1
                         break
                 if flag == 0:
                     print("Second item in merge tuple " + s + " not in version 2 list of runs")
                     exit()
+                self.v1_v2_to_merge.append(s.split('-'))
             self.log_file = self.read_setting("log_file")[0]
             self.out_path = self.read_setting("out_path")[0]
-            self.std_av = self.read_setting("std_av")
-            self.ml_av = self.read_setting("ml_av")
-    
+            self.std_av = []
+            for s in self.read_setting("std_av"):
+                self.std_av.append(s.split('-'))
+            self.ml_av = []
+            for s in self.read_setting("ml_av"):
+                self.ml_av.append(s.split('-'))
+
     def read_setting(self, opt_name: str, dtype='str'):
         self.in_file = open(self.file_path, "r")
         lines = self.in_file.readlines()
@@ -151,10 +157,6 @@ class Data_weight:
 class Read_connected:
     def __init__(self,  in_f: Input_file):
         log = open(in_f.log_file, 'w')
-
-        v1_to_merge = []
-        for s in in_f.to_merge:
-            v1_to_merge.append(s.split('-'))
         
         #Reading weights
         l1_w_config = []
@@ -175,39 +177,34 @@ class Read_connected:
             
             l0_files = self.level0_to_read(in_f.corr_runs_path + in_f.corr_runs_v1[i] + "/dat/")
             
-            l1_config = []
+            l1_prod = []
+            l1_w_av = []
             count = 0 
             for f_to_read in l0_files:
                 self.write_log("\tReading level 0 configuration number {}".format(count + 1), log)
 
                 d = self.read_level1_config(in_f.corr_runs_path + in_f.corr_runs_v1[i] + "/dat/" + f_to_read, endian='little', version='V1', in_f=in_f)
-                self.l1_averages_prod(d, l1_w_config[count], in_f)
-                l1_av = np.reshape(l1_av, (1, len(l1_av)))
-                if len(self.l1_config) == 0:
-                    self.l1_config = l1_av
-                else:
-                    self.l1_config = np.append(self.l1_config, l1_av, axis=0)
+                p, w = self.l1_averages(d, l1_w_config[count], in_f)
+                l1_prod.append(p)
+                l1_w_av.append(w)
                 count += 1
             
-            for m in self.v1_to_merge:
+            for m in in_f.v1_v2_to_merge:
                 if m[0] == in_f.corr_runs_v1[i]:
                     self.write_log("Merging to " + m[1], log)
-                    self.l0_v2 = self.level0_to_read(in_f.corr_runs_path + m[1] + "/dat/")
+                    l0_files = self.level0_to_read(in_f.corr_runs_path + m[1] + "/dat/")
                     
-                    for f_to_read in self.l0_v2:
+                    for f_to_read in l0_files:
                         self.write_log("\tReading level 0 configuration number {}".format(count + 1), log)
+                        
                         d = self.read_level1_config(in_f.corr_runs_path + m[1] + "/dat/" + f_to_read, endian='little', version='V2', in_f=in_f)
-                        l1_av = self.compute_l1_averages(d, l1_w_config[count])
-                        l1_av = np.reshape(l1_av, (1, len(l1_av)))
-                        if len(self.l1_config) == 0:
-                            self.l1_config = l1_av
-                        else:
-                            self.l1_config = np.append(self.l1_config, l1_av, axis=0)
+                        p, w = self.l1_averages(d, l1_w_config[count], in_f)
+                        l1_prod.append(p)
+                        l1_w_av.append(w)
                         count += 1
-                    in_f.corr_runs_v2 = np.delete(in_f.corr_runs_v2, np.where(in_f.corr_runs_v2 == m[1]))
                     break
             
-            av_run, jack_run = self.compute_l0_averages(self.l1_config)
+            av_run, jack_run = self.l0_averages(l1_prod, l1_w_av)
             self.print_prefolding(self.l1_config, in_f.out_path + in_f.corr_runs_v1[i] + "_prefolding.txt")
             var_run = np.zeros(0, dtype='f8')
             for t in range(len(jack_run[:, 0])):
@@ -393,32 +390,32 @@ class Read_connected:
         print(string, flush=True)
         sys.stdout = stdoustream
 
-    def l1_averages_prod(self, d:Data_conn, w:Data_weight, f:Input_file):
-        av_op = np.mean(d.configuration, axis=2, dtype='f8')
-        av_src = np.mean(av_op, axis=1, dtype='f8')
+    def l1_averages(self, d:Data_conn, w:Data_weight, f:Input_file):
+        av_op = np.mean(d.configuration, axis=len(f.n_config_l1) + 1, dtype='f8')
+        av_src = np.mean(av_op, axis=len(f.n_config_l1), dtype='f8')
         dims = av_src.shape
-        
-        #Standard average
-        #for sc in in_f.std_av:
-        #    for to_select in sc.split('-'):
-        #        for c in range(dims[0]):
-        #            if d.id_conf[c]
 
-    def compute_l0_averages(self, l1:np.ndarray):
-        av_t = np.zeros(0, dtype='f8')
-        n0 = len(l1[:, 0])
-        T = len(l1[0, :])
-        jack_t = np.zeros((0, n0), dtype='f8')
-        for t in range(int(T/2)):
-            mean, jack = jacknife(l1[:, t])
-            if t == 0:
-                av_t = np.append(av_t, mean)
-                jack_t = np.append(jack_t, np.reshape(jack, (1, n0)), axis = 0)
-            else:
-                mean_t_refl, jack_t_refl = jacknife(l1[:, T - t])
-                av_t = np.append(av_t, 0.5*(mean + mean_t_refl))
-                jack_t = np.append(jack_t, np.reshape(0.5*(jack + jack_t_refl), (1, n0)), axis = 0)
-        return av_t, jack_t
+        #Standard average
+        mean = np.zeros((2, len(in_f.std_av), dims[-1]))
+        weight = np.zeros((2, len(in_f.std_av)))
+        for i in range(len(in_f.std_av)):
+            for j in range(len(in_f.std_av[i])):
+                for t in range(dims[-1]):
+                    mean[0][i][t] += -av_src[int(in_f.std_av[i][j]), int(in_f.std_av[i][j])][t] * w.configuration[0, int(in_f.std_av[i][j]), int(in_f.std_av[i][j])] / len(in_f.std_av[i])
+                weight[0][i] += w.configuration[0, int(in_f.std_av[i][j]), int(in_f.std_av[i][j])] / len(in_f.std_av[i])
+
+        for i in range(len(in_f.ml_av)):
+            for j in range(len(in_f.ml_av[i])):
+                for k in range(len(in_f.ml_av[i])):
+                    for t in range(dims[-1]):
+                        mean[1][i][t] += -av_src[int(in_f.ml_av[i][j]), int(in_f.ml_av[i][k])][t] * w.configuration[0, int(in_f.ml_av[i][j]), int(in_f.ml_av[i][k])] / (len(in_f.ml_av[i])**2.0)
+                    weight[1][i] += w.configuration[0, int(in_f.ml_av[i][j]), int(in_f.ml_av[i][k])] / (len(in_f.ml_av[i])**2.0)
+        
+        mean = np.roll(mean, -d.y0, axis=2)
+        return mean, weight
+
+    def l0_averages(self, prod:list, w:list):
+        
 
     def print_run(self, corr, std_dev_corr, path):
         f = open(path, "w")
