@@ -224,7 +224,9 @@ class Read_connected:
             self.print_run(c_run, in_f.out_path + in_f.corr_runs_v1[i])
             averages.append(c_run)
 
-        self.print_run(self.run_averages(averages), in_f.out_path + "_total")
+        w_av = self.run_averages(averages)
+        self.print_run(w_av, in_f.out_path + "_total")
+        self.print_run(self.folding(w_av), in_f.out_path + "_folded")
         log.close()
 
     def level0_to_read(self, path: str):
@@ -368,7 +370,7 @@ class Read_connected:
         f.close()
         return data
         
-    def write_log(self, string:'str', f):
+    def write_log(self, string:str, f):
         sys.stdout = f
         print(string, flush=True)
         sys.stdout = stdoustream
@@ -453,12 +455,31 @@ class Read_connected:
                         sum = sum + (runs[i][at][s][t] / runs[i][at][s][t].variance())
                         sum_weight += 1/runs[i][at][s][t].variance()
                     corr_t.append(sum/sum_weight)
-                    print(corr_t[-1].mean, np.sqrt(corr_t[-1].variance()))
                 corr_s.append(corr_t)
             corr.append(corr_s)
 
         return corr
 
+    def folding(self, av):
+        n_av_type = len(av)
+        n_sets = len(av[0])
+        n_times = len(av[0][0])
+
+        corr = []
+        for at in range(n_av_type):
+            corr_s = []
+            for s in range(n_sets):
+                corr_t = []
+                for t in range(int(n_times / 2)):
+                    if t == 0:
+                        corr_t.append(av[at][s][t])
+                    else:
+                        corr_t.append((av[at][s][t] + av[at][s][n_times - t]) / 2.0)
+                corr_s.append(corr_t)
+            corr.append(corr_s)
+        
+        return corr
+        
 #Execution
 if(len(sys.argv) < 2):
     print("Usage: python3 " + sys.argv[0] + " input_file.in")
