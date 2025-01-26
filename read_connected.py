@@ -88,10 +88,10 @@ class Jacknife:
         return (len(self.jack) - 1) * np.var(self.jack)
     
     def iscompatible(self, var):
-        if not isinstance(var, Jacknife):
+        if not isinstance(var, Jacknife) and not isinstance(var, float):
             print("Non compatible types: Jacknife + " + str(type(var)))
             return False
-        elif len(self.jack) != len(var.jack):
+        elif isinstance(var, Jacknife) and len(self.jack) != len(var.jack):
             print("Jacknife vectors have not equal length: {} and {}".format(len(self.jack), len(var.jack)))
             return False
         else:
@@ -118,19 +118,29 @@ class Jacknife:
     def __mul__(self, var):
         if not self.iscompatible(var):
             exit(1)
-        else:
+        if isinstance(var, Jacknife):
             prod = Jacknife()
             prod.mean = self.mean * var.mean
             prod.jack = self.jack * var.jack
+            return prod
+        else:
+            prod = Jacknife()
+            prod.mean = self.mean * var
+            prod.jack = self.jack * var
             return prod
         
     def __truediv__(self, var):
         if not self.iscompatible(var):
             exit(1)
-        else:
+        if isinstance(var, Jacknife):
             quo = Jacknife()
             quo.mean = self.mean / var.mean
             quo.jack = self.jack / var.jack
+            return quo
+        else:
+            quo = Jacknife()
+            quo.mean = self.mean / var
+            quo.jack = self.jack / var
             return quo
 
 #Class for the structure of the unweighted correlators
@@ -168,9 +178,7 @@ class Read_connected:
             for f_to_read in l0_files:
                 l1_w_config.append(self.read_level1_weight(in_f.weight_runs_path + in_f.weight_runs[i] + "/dat/" + f_to_read, endian='little', in_f=in_f))
 
-        self.averages = []
-        self.jack = []    
-        
+        averages = []   
         #Reading correlators version 1 
         for i in range(len(in_f.corr_runs_v1)):
             self.write_log("Reading run number " + in_f.corr_runs_v1[i] + ", version 1", log)
@@ -179,16 +187,20 @@ class Read_connected:
             
             l1_prod = []
             l1_w_av = []
+            
             count = 0 
             for f_to_read in l0_files:
                 self.write_log("\tReading level 0 configuration number {}".format(count + 1), log)
 
                 d = self.read_level1_config(in_f.corr_runs_path + in_f.corr_runs_v1[i] + "/dat/" + f_to_read, endian='little', version='V1', in_f=in_f)
                 p, w = self.l1_averages(d, l1_w_config[count], in_f)
-                l1_prod.append(p)
-                l1_w_av.append(w)
+                if count == 0:
+                    l1_prod = p[np.newaxis, ...]
+                    l1_w_av = w[np.newaxis, ...]
+                else:
+                    l1_prod = np.append(l1_prod, p[np.newaxis, ...], axis=0)
+                    l1_w_av = np.append(l1_w_av, w[np.newaxis, ...], axis=0)
                 count += 1
-            
             for m in in_f.v1_v2_to_merge:
                 if m[0] == in_f.corr_runs_v1[i]:
                     self.write_log("Merging to " + m[1], log)
@@ -199,49 +211,20 @@ class Read_connected:
                         
                         d = self.read_level1_config(in_f.corr_runs_path + m[1] + "/dat/" + f_to_read, endian='little', version='V2', in_f=in_f)
                         p, w = self.l1_averages(d, l1_w_config[count], in_f)
-                        l1_prod.append(p)
-                        l1_w_av.append(w)
+                        if count == 0:
+                            l1_prod = p[np.newaxis, ...]
+                            l1_w_av = w[np.newaxis, ...]
+                        else:
+                            l1_prod = np.append(l1_prod, p[np.newaxis, ...], axis=0)
+                            l1_w_av = np.append(l1_w_av, w[np.newaxis, ...], axis=0)
                         count += 1
                     break
             
-            av_run, jack_run = self.l0_averages(l1_prod, l1_w_av)
-            self.print_prefolding(self.l1_config, in_f.out_path + in_f.corr_runs_v1[i] + "_prefolding.txt")
-            var_run = np.zeros(0, dtype='f8')
-            for t in range(len(jack_run[:, 0])):
-                var_run = np.append(var_run, var_jack(jack_run[t]))
-            self.print_run(av_run, np.sqrt(var_run), in_f.out_path + in_f.corr_runs_v1[i] + ".txt")
+            c_run = self.l0_averages(np.array(l1_prod), np.array(l1_w_av))
+            self.print_run(c_run, in_f.out_path + in_f.corr_runs_v1[i])
+            averages.append(c_run)
 
-            self.averages.append(av_run)
-            self.jack.append(jack_run)
-        #Reading correlators version 2  
-        for i in range(len(in_f.corr_runs_v2)):
-            self.write_log("Reading run number " + in_f.corr_runs_v2[i] + ", version 2", log)
-            self.l0_v2 = self.level0_to_read(in_f.corr_runs_path + in_f.corr_runs_v2[i] + "/dat/")
-
-            count = 0
-            self.l1_config = []
-            for f_to_read in self.l0_v2:
-                self.write_log("\tReading level 0 configuration number {}".format(count + 1), log)
-                d = self.read_level1_config(in_f.corr_runs_path + in_f.corr_runs_v2[i] + "/dat/" + f_to_read, endian='little', version='V2', in_f=in_f)
-                l1_av = self.compute_l1_averages(d, l1_w_config[count])
-                l1_av = np.reshape(l1_av, (1, len(l1_av)))
-                if len(self.l1_config) == 0:
-                    self.l1_config = l1_av
-                else:
-                    self.l1_config = np.append(self.l1_config, l1_av, axis=0)
-                count += 1
-            
-            av_run, jack_run = self.compute_l0_averages(self.l1_config)
-            var_run = np.zeros(0, dtype='f8')
-            for t in len(jack_run[:, 0]):
-                var_run = np.append(var_run, var_jack(jack_run[t]))
-            self.print_run(av_run, np.sqrt(var_run), in_f.out_path + in_f.corr_runs_v2[i] + ".txt")
-
-            self.averages.append(av_run)
-            self.jack.append(jack_run)
-        
-        all_run_av, all_run_var = self.compute_run_averages(np.array(self.averages), np.array(self.jack))
-        self.print_run(all_run_av, np.sqrt(all_run_var), in_f.out_path + "_total.txt")
+        self.print_run(self.run_averages(averages), in_f.out_path + "_total")
         log.close()
 
     def level0_to_read(self, path: str):
@@ -414,47 +397,67 @@ class Read_connected:
         mean = np.roll(mean, -d.y0, axis=2)
         return mean, weight
 
-    def l0_averages(self, prod:list, w:list):
+    def l0_averages(self, prod:np.ndarray, weight:np.ndarray):
+        av_type = prod.shape[1]
+        l1_set = prod.shape[2]
+        times = prod.shape[3]
         
+        cav = []
+        for av in range(av_type):
+            cs = []
+            for s in range(l1_set):
+                ct = []
+                for t in range(times):
+                    p = Jacknife(prod[:, av, s, t])
+                    w = Jacknife(weight[:, av, s])
+                    ct.append(p/w)
+                cs.append(ct)
+            cav.append(cs)
+        
+        return cav
 
-    def print_run(self, corr, std_dev_corr, path):
-        f = open(path, "w")
-        
-        sys.stdout = f
-        for i in range(len(corr)):
-            print("{} {}".format(corr[i], std_dev_corr[i]), flush=True)
-        sys.stdout = stdoustream
-        
+    def print_run(self, corr, path):
+        n_sets = len(corr[0])
+        n_times = len(corr[0][0])
+        for s in range(n_sets):
+            f = open(path + "_std_{}.txt".format(s + 1), "w")
+            sys.stdout = f
+            for t in range(n_times):
+                print("{} {}".format(corr[0][s][t].mean, np.sqrt(corr[0][s][t].variance())))
+            sys.stdout = stdoustream
+        f.close()
+
+        for s in range(n_sets):
+            f = open(path + "_ml_{}.txt".format(s + 1), "w")
+            sys.stdout = f
+            for t in range(n_times):
+                print("{} {}".format(corr[1][s][t].mean, np.sqrt(corr[1][s][t].variance())))
+            sys.stdout = stdoustream
         f.close()
     
-    def print_prefolding(self, l1:np.ndarray, path:str):
-        f = open(path, "w")
+    def run_averages(self, runs):
+        n_runs = len(runs)
+        n_av_type = len(runs[0])
+        n_sets = len(runs[0][0])
+        n_times = len(runs[0][0][0])
         
-        sys.stdout = f
-        T = len(l1[0, :])
-        for t in range(int(T)):
-            mean, jack = jacknife(l1[:, t])
-            print(f"{mean} {np.sqrt(var_jack(jack))}")
-        sys.stdout = stdoustream
-        
-        f.close()
+        corr = []
+        for at in range(n_av_type):
+            corr_s = []
+            for s in range(n_sets):
+                corr_t = []
+                for t in range(n_times):
+                    sum = Jacknife(np.zeros(runs[0][0][0][0].jack.shape))
+                    sum_weight = 0.0
+                    for i in range(n_runs):
+                        sum = sum + (runs[i][at][s][t] / runs[i][at][s][t].variance())
+                        sum_weight += 1/runs[i][at][s][t].variance()
+                    corr_t.append(sum/sum_weight)
+                    print(corr_t[-1].mean, np.sqrt(corr_t[-1].variance()))
+                corr_s.append(corr_t)
+            corr.append(corr_s)
 
-    def compute_run_averages(self, av_l0:np.ndarray, jack_l0:np.ndarray):
-        weights = np.zeros(av_l0.shape, dtype = 'f8')
-        for run in range(len(av_l0[:, 0])):
-            for t in range(len(av_l0[0, :])):
-                weights[run, t] = 1.0/var_jack(jack_l0[run, t])
-
-        av = np.average(av_l0, axis = 0, weights=weights)
-        jack_av = np.zeros((len(av), 0), dtype='f8')
-        for j in range(len(jack_l0[0, 0, :])):
-            jack_av = np.append(jack_av, np.reshape(np.average(jack_l0[:, :, j], axis = 0, weights=weights), (len(av), 1)), axis=1)
-        
-        var = np.zeros(0, dtype='f8')
-        for t in range(len(av)):
-            var = np.append(var, var_jack(jack_av[t]))
-        
-        return av, var
+        return corr
 
 #Execution
 if(len(sys.argv) < 2):

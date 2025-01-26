@@ -10,12 +10,12 @@ to_merge
 
 [LATTICE]
 l1_configurations_per_slice 10 10
-std_av 0-4-9
-ml_av 0-4-9
+std_av 0-4-9 0-1-2-3-4-5-6-7-8-9
+ml_av 0-4-9 0-1-2-3-4-5-6-7-8-9
 
 [OPERATORS]
 op_to_average 2 3 4
 
 [OUTPUT]
 log_file /data/knuth/home/dtoniolo/Analysis_spectral_densities/out/log.txt
-out_path /data/knuth/home/dtoniolo/Analysis_spectral_densities/out/run
+out_path /data/knuth/home/dtoniolo/Analysis_spectral_densities/out/run_new
