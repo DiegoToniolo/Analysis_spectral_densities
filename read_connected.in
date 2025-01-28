@@ -6,7 +6,7 @@ weight_runs_path /data/knuth/home/saccardi/MB-DD-HMC/backup/ms1/F7g/run
 corr_runs_v1 4
 corr_runs_v2 
 weight_runs 1
-to_merge 
+to_merge
 
 [LATTICE]
 l1_configurations_per_slice 10 10
@@ -18,4 +18,4 @@ op_to_average 2 3 4
 
 [OUTPUT]
 log_file /data/knuth/home/dtoniolo/Analysis_spectral_densities/out/log.txt
-out_path /data/knuth/home/dtoniolo/Analysis_spectral_densities/out/run_new
+out_path /data/knuth/home/dtoniolo/Analysis_spectral_densities/out/data/run_vector
