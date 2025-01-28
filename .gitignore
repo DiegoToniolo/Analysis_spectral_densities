@@ -1,2 +1,4 @@
 *.txt
 *.in
+!read_connected.in
+!plot_corr.in
