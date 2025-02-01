@@ -66,10 +66,7 @@ class Input_file:
         if flag == 0:
             print("Option " + opt_name + " not found")
             exit(1)
-        if len(tokens) == 1 and dtype != 'str':
-            return tokens[0]
-        else:
-            return tokens
+        return tokens
 
 #Class of jacknife variables
 class Jacknife:
