@@ -2,6 +2,9 @@
 in_dir /data/knuth/home/dtoniolo/Analysis_spectral_densities/out/vector/data/
 out_dir /data/knuth/home/dtoniolo/Analysis_spectral_densities/out/vector/plots/
 
+[Operator]
+op vectorial
+
 [Error Analysis]
 err_ratios run_vector_total_ml_4.txt-run_vector_total_std_4.txt
 exp_perf 0.10

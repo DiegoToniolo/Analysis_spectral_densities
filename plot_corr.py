@@ -19,6 +19,7 @@ class Input_file:
             if len(self.exp_perf) != len(self.err_ratios[:, 0]):
                 print("Number of expected performance different from number of ratios")
                 exit(1)
+            self.op = self.read_setting("op")[0]
     
     def read_setting(self, opt_name: str, dtype='str'):
         self.in_file = open(self.file_path, "r")
@@ -62,7 +63,7 @@ class main:
             plt.grid(True)
             plt.xlabel("t/a")
             plt.ylabel(r"$C(t)$")
-            plt.title("Correlator of the vector current")
+            plt.title("Correlator of the " + in_f.op + " current")
             plt.semilogy()
             plt.savefig(in_f.out_dir + df.split(".")[0] + ".png")
             plt.close()
@@ -84,7 +85,7 @@ class main:
             y_grid.fill(in_f.exp_perf[i])
             plt.grid()
             plt.xlabel("t/a")
-            plt.ylabel(r"$\sigma_{\mathrm{std}}^2/\sigma_{\mathrm{ml}}^2$")
+            plt.ylabel(r"$\sigma_{\mathrm{std}}^2/\sigma_{\mathrm{ml}}^2$ of the " + in_f.op + " current")
             plt.plot(x_grid, y_grid, "black", linestyle="--", linewidth=3, label="Expected performance")
             plt.legend()
             plt.title("Variance ratio between Standard and Multilevel averages")
