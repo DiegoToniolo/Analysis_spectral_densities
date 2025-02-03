@@ -8,3 +8,12 @@ op vectorial
 [Error Analysis]
 err_ratios run_vector_total_ml_4.txt-run_vector_total_std_4.txt
 exp_perf 0.10
+
+[Performance plot]
+reference run_vector_total_ml_1.txt
+compared run_vector_total_ml_1.txt run_vector_total_ml_2.txt run_vector_total_ml_3.txt run_vector_total_ml_4.txt
+names 1 3 3* 10
+perf_ml 1 9 9 100
+title ML performance using different number of configurations
+plot_name ML_perf.png
+y_range 0.008 1.5

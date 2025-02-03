@@ -20,6 +20,19 @@ class Input_file:
                 print("Number of expected performance different from number of ratios")
                 exit(1)
             self.op = self.read_setting("op")[0]
+            self.reference = self.read_setting("reference")[0]
+            self.compared = self.read_setting("compared")
+            self.names = self.read_setting("names")
+            if len(self.names) != len(self.compared):
+                print("Number of compared and names are different")
+                exit(1)
+            self.perf_ml = self.read_setting("perf_ml", 'float')
+            t = self.read_setting("title")
+            self.title = t[0]
+            for i in range(1, len(t)):
+                self.title += " " + t[i]
+            self.plot_name = self.read_setting("plot_name")[0]
+            self.y_range = self.read_setting("y_range", 'float')
     
     def read_setting(self, opt_name: str, dtype='str'):
         self.in_file = open(self.file_path, "r")
@@ -67,6 +80,7 @@ class main:
             plt.semilogy()
             plt.savefig(in_f.out_dir + df.split(".")[0] + ".png")
             plt.close()
+            f.close()
 
         for i in range(len(in_f.err_ratios)):
             err = np.zeros(0)
@@ -91,8 +105,37 @@ class main:
             plt.title("Variance ratio between Standard and Multilevel averages")
             plt.savefig(in_f.out_dir + "err_ratio_" + in_f.err_ratios[i, 0].split(".")[0] + "_" + in_f.err_ratios[i, 1].split(".")[0])
             plt.close()
-
-
+            f1.close()
+            f2.close()
+        
+        for i in range(len(in_f.compared)):
+            x_grid = np.linspace(0, len(err), 1000)
+            y_grid = np.zeros(len(x_grid))
+            y_grid.fill(1.0/in_f.perf_ml[i])
+            plt.plot(x_grid, y_grid, "black", linestyle="--", linewidth=2)
+        for i in range(len(in_f.compared)):
+            err = np.zeros(0)
+            f_ref = open(in_f.in_dir + in_f.reference)
+            f_comp = open(in_f.in_dir + in_f.compared[i])
+            l_ref = f_ref.readlines()
+            l_comp = f_comp.readlines()
+            if len(l_ref) != len(l_comp):
+                print("Plot of ML performance: reference and compared have different number of times")
+                print(len(l_ref), len(l_comp))
+                exit(1)
+            for l in range(len(l_ref)):
+                err = np.append(err, float(l_comp[l].split()[1]) ** 2.0 / float(l_ref[l].split()[1]) ** 2.0)
+            plt.plot(np.array(range(len(l_ref))), err, "o", markersize=4, label=r"$n_1 = $" + in_f.names[i])
+        plt.grid()
+        plt.semilogy()
+        plt.title(in_f.title)
+        plt.xlabel("t/a")
+        plt.ylabel("Ratio of variances")
+        plt.legend(loc="upper left")
+        plt.ylim(in_f.y_range[0], in_f.y_range[1])
+        plt.savefig(in_f.out_dir + in_f.plot_name)
+        plt.close()
+        
     def data_to_read(self, in_f:Input_file = Input_file("")) -> list:
         cmd_cd = ['ls', in_f.in_dir]
         proc = subprocess.Popen(cmd_cd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
