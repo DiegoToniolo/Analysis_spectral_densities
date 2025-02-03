@@ -17,3 +17,4 @@ perf_ml 1 9 9 100
 title ML performance using different number of configurations
 plot_name ML_perf.png
 y_range 0.008 1.5
+legend_loc upper left

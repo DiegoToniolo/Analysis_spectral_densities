@@ -33,6 +33,10 @@ class Input_file:
                 self.title += " " + t[i]
             self.plot_name = self.read_setting("plot_name")[0]
             self.y_range = self.read_setting("y_range", 'float')
+            t = self.read_setting("legend_loc")
+            self.legend_loc = t[0]
+            for i in range(1, len(t)):
+                self.legend_loc += " " + t[i]
     
     def read_setting(self, opt_name: str, dtype='str'):
         self.in_file = open(self.file_path, "r")
@@ -131,7 +135,7 @@ class main:
         plt.title(in_f.title)
         plt.xlabel("t/a")
         plt.ylabel("Ratio of variances")
-        plt.legend(loc="upper left")
+        plt.legend(loc=in_f.legend_loc)
         plt.ylim(in_f.y_range[0], in_f.y_range[1])
         plt.savefig(in_f.out_dir + in_f.plot_name)
         plt.close()
