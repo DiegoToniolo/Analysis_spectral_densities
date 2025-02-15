@@ -71,3 +71,10 @@ class Jackknife:
             quo.jack = self.jack / var
             return quo
 
+    def der_function(self, f:callable):
+        res = Jackknife()
+        res.mean = f(self.mean)
+        res.jack = f(self.jack)
+
+        return res
+
