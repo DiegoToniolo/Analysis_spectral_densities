@@ -2,6 +2,7 @@ import sys
 import subprocess
 import numpy as np
 import re
+from jackknife import Jackknife
 
 stdoustream = sys.stdout
 
@@ -67,78 +68,6 @@ class Input_file:
             print("Option " + opt_name + " not found")
             exit(1)
         return tokens
-
-#Class of jacknife variables
-class Jacknife:
-    def __init__(self, data:np.ndarray=np.array([0, 0])):
-        self.mean, self.jack = self.jacknife(data)
-    
-    def jacknife(self, a):
-        mean = np.mean(a, dtype='f8')
-        jack = np.zeros(len(a), dtype='f8')
-        for i in range(len(a)):
-            jack[i] = mean - (a[i] - mean)/(len(a) - 1)
-    
-        return mean, jack
-    
-    def variance(self):
-        return (len(self.jack) - 1) * np.var(self.jack)
-    
-    def iscompatible(self, var):
-        if not isinstance(var, Jacknife) and not isinstance(var, float):
-            print("Non compatible types: Jacknife + " + str(type(var)))
-            return False
-        elif isinstance(var, Jacknife) and len(self.jack) != len(var.jack):
-            print("Jacknife vectors have not equal length: {} and {}".format(len(self.jack), len(var.jack)))
-            return False
-        else:
-            return True
-
-    def __add__(self, var):
-        if not self.iscompatible(var):
-            exit(1)
-        else:
-            sum = Jacknife()
-            sum.mean = self.mean + var.mean
-            sum.jack = self.jack + var.jack
-            return sum
-    
-    def __sub__(self, var):
-        if not self.iscompatible(var):
-            exit(1)
-        else:
-            diff = Jacknife()
-            diff.mean = self.mean - var.mean
-            diff.jack = self.jack - var.jack
-            return diff
-    
-    def __mul__(self, var):
-        if not self.iscompatible(var):
-            exit(1)
-        if isinstance(var, Jacknife):
-            prod = Jacknife()
-            prod.mean = self.mean * var.mean
-            prod.jack = self.jack * var.jack
-            return prod
-        else:
-            prod = Jacknife()
-            prod.mean = self.mean * var
-            prod.jack = self.jack * var
-            return prod
-        
-    def __truediv__(self, var):
-        if not self.iscompatible(var):
-            exit(1)
-        if isinstance(var, Jacknife):
-            quo = Jacknife()
-            quo.mean = self.mean / var.mean
-            quo.jack = self.jack / var.jack
-            return quo
-        else:
-            quo = Jacknife()
-            quo.mean = self.mean / var
-            quo.jack = self.jack / var
-            return quo
 
 #Class for the structure of the unweighted correlators
 class Data_conn:
@@ -409,8 +338,8 @@ class Read_connected:
             for s in range(l1_set):
                 ct = []
                 for t in range(times):
-                    p = Jacknife(prod[:, av, s, t])
-                    w = Jacknife(weight[:, av, s])
+                    p = Jackknife(prod[:, av, s, t])
+                    w = Jackknife(weight[:, av, s])
                     ct.append(p/w)
                 cs.append(ct)
             cav.append(cs)
@@ -448,7 +377,7 @@ class Read_connected:
             for s in range(n_sets):
                 corr_t = []
                 for t in range(n_times):
-                    sum = Jacknife(np.zeros(runs[0][0][0][0].jack.shape))
+                    sum = Jackknife(np.zeros(runs[0][0][0][0].jack.shape))
                     sum_weight = 0.0
                     for i in range(n_runs):
                         sum = sum + (runs[i][at][s][t] / runs[i][at][s][t].variance())
