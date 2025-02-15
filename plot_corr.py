@@ -103,7 +103,7 @@ class main:
             y_grid.fill(in_f.exp_perf[i])
             plt.grid()
             plt.xlabel("t/a")
-            plt.ylabel(r"$\sigma_{\mathrm{std}}^2/\sigma_{\mathrm{ml}}^2$ of the " + in_f.op + " current")
+            plt.ylabel(r"$\sigma_{\mathrm{ml}}^2/\sigma_{\mathrm{std}}^2$ of the " + in_f.op + " current")
             plt.plot(x_grid, y_grid, "black", linestyle="--", linewidth=3, label="Expected performance")
             plt.legend()
             plt.title("Variance ratio between Standard and Multilevel averages")

@@ -18,4 +18,4 @@ op_to_average 2 3 4
 
 [OUTPUT]
 log_file /data/knuth/home/dtoniolo/Analysis_spectral_densities/out/log.txt
-out_path /data/knuth/home/dtoniolo/Analysis_spectral_densities/out/data/run_vector
+out_path /data/knuth/home/dtoniolo/Analysis_spectral_densities/out/run_vector

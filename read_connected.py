@@ -223,7 +223,9 @@ class Read_connected:
 
         w_av = self.run_averages(averages)
         self.print_run(w_av, in_f.out_path + "_total")
-        self.print_run(self.folding(w_av), in_f.out_path + "_folded")
+        folded = self.folding(w_av)
+        self.print_run(folded, in_f.out_path + "_folded")
+        self.print_jack(folded[1][-1], in_f.out_path + "_jack")
         log.close()
 
     def level0_to_read(self, path: str):
@@ -476,7 +478,15 @@ class Read_connected:
             corr.append(corr_s)
         
         return corr
-        
+
+    def print_jack(self, corr, out):
+        f = open(out + ".txt", "w")
+        sys.stdout = f
+        for t in range(len(corr)):
+            for j in range(len(corr[t].jack)):
+                print(corr[t].jack[j])
+        sys.stdout = stdoustream
+
 #Execution
 if(len(sys.argv) < 2):
     print("Usage: python3 " + sys.argv[0] + " input_file.in")
