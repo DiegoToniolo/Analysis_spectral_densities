@@ -2,33 +2,61 @@ import numpy as np
 from scipy.optimize import curve_fit
 from matplotlib import pyplot as plt
 import sys
+from corr_fits import Corr_fits
+from jackknife import Jackknife
+
+class Single_exp:
+    def fit_f(self, x, C1, m1):
+        return C1 * np.exp(-m1 * x)
+    
+    def f(self, x, par):
+        return self.fit_f(x, par[0], par[1])
+    
+    def der0(self, x, par):
+        return np.exp(- par[1] * x)
+    
+    def der1(self, x, par):
+        return - par[0] * par[1] * x * np.exp(- par[1] * x)
+    
+    def der_list(self):
+        self.der0
+        return [self.der0, self.der1]
+
+s_exp = Single_exp()
+c_f = Corr_fits()
 
 class main:
-    def __init__(self, path:str) -> None:
-        df = open(sys.argv[1], "r")
+    def __init__(self, path_data:str, path_jack:str) -> None:
+        jack = self.read_jack(path_data, path_jack)
         
-        corr, err_c = self.read_points(df)
+        cov_data = np.zeros((len(jack), len(jack)))
+        for t_a in range(len(jack)):
+            for t_b in range(len(jack)):
+                cov_data[t_a, t_b] = jack[t_a].covariance(jack[t_b])
+
+        corr = np.zeros(len(jack))
+        err_c = np.zeros(len(jack))
+        for t in range(len(jack)):
+            corr[t], err_c[t] = jack[t].mean, np.sqrt(cov_data[t, t])
+
         t = np.array(range(len(corr)))
-        par, cov = curve_fit(self.expr_corr_cond, t[3:], corr[3:], p0 = [ 0.02, 0.75], sigma=err_c[3:])
-        err_par = np.zeros(0)
-        for i in range(len(par)):
-            err_par = np.append(err_par, np.sqrt(cov[i, i]))
-        print(par)
-        print(err_par)
-        
+        for t0 in range(10, 31):
+            par, _ = curve_fit(s_exp.fit_f, t[t0:], corr[t0:], p0 = [0.02, 0.2], sigma=err_c[t0:])
+            print(t0, c_f.chi2(s_exp.f, par, t[t0:], corr[t0:], err_c[t0:]) / c_f.exp_chi2(s_exp.der_list(), par, t[t0:], cov_data[t0:, t0:]))
+
         xgrid = np.linspace(0, t[-1], 1000)
         plt.errorbar(t, corr, err_c, fmt="o", ecolor='black', elinewidth=2, markersize = 4)
-        plt.plot(xgrid, self.expr_corr_cond(xgrid, par[0], par[1]))
+        plt.plot(xgrid, s_exp.f(xgrid, par))
         plt.semilogy()
         plt.xlabel(r"$t/a$")
         plt.ylabel(r"Correlator")
         plt.grid(True)
         plt.savefig("plot.png")
         plt.close()
-        df.close()
 
-    def read_points(self, data_file:__file__):
-        data = data_file.readlines()
+    def read_points(self, path:str):
+        df = open(path, "r")
+        data = df.readlines()
         c = np.zeros(0)
         err = np.zeros(0)
         for d in data:
@@ -39,19 +67,32 @@ class main:
             else:
                 break
         
+        df.close()
         return c, err
     
-    def single_exp(self, x, C1, m1):
-        return C1 * np.exp(-m1 * x)
-    
-    def expr_corr(self, x, C1, m1, C2, m2):
-        return C1 * np.exp(-m1 * x) + C2 * np.exp(-m2 * x)
-    
-    def expr_corr_cond(self, x, C2, m2):
-        return self.expr_corr(x, 0.001539, 0.28189, C2, m2)
+    def read_jack(self, path_mean, path_jack):
+        df = open(path_mean, "r")
+        jf = open(path_jack, "r")
+
+        d = df.readlines()
+
+        data = []
+        for line in d:
+            if float(line.split()[1])/float(line.split()[0]) > 0.10:
+                break
+            jack = np.zeros(25)
+            for i in range(25):
+                jack[i]  = float(jf.readline())
+            data.append(Jackknife())
+            data[-1].mean = float((line.split())[0])
+            data[-1].jack = jack
         
-if len(sys.argv) < 2:
-    print("Usage: " + sys.argv[0] + " data_file")
+        df.close()
+        jf.close()
+        return data
+        
+if len(sys.argv) < 3:
+    print("Usage: " + sys.argv[0] + " data_file jack_file")
     exit(1)
 
-main(sys.argv[1])
+main(sys.argv[1], sys.argv[2])

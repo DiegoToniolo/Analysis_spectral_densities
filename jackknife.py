@@ -15,6 +15,14 @@ class Jackknife:
     def variance(self):
         return (len(self.jack) - 1) * np.var(self.jack)
     
+    def covariance(self, var):
+        if not self.iscompatible(var):
+            exit(1)
+        elif isinstance(var, float):
+            exit(1)
+        else:
+            return (len(self.jack) - 1) * np.sum((self.jack - np.mean(self.jack)) * (var.jack - np.mean(var.jack)), dtype='f8') /len(self.jack)
+    
     def iscompatible(self, var):
         if not isinstance(var, Jackknife) and not isinstance(var, float):
             print("Non compatible types: Jacknife + " + str(type(var)))
@@ -77,4 +85,3 @@ class Jackknife:
         res.jack = f(self.jack)
 
         return res
-
