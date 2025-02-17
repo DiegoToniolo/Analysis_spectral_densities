@@ -19,11 +19,9 @@ class Single_exp:
         return - par[0] * par[1] * x * np.exp(- par[1] * x)
     
     def der_list(self):
-        self.der0
         return [self.der0, self.der1]
 
 s_exp = Single_exp()
-c_f = Corr_fits()
 
 class main:
     def __init__(self, path_data:str, path_jack:str) -> None:
@@ -40,10 +38,11 @@ class main:
             corr[t], err_c[t] = jack[t].mean, np.sqrt(cov_data[t, t])
 
         t = np.array(range(len(corr)))
-        for t0 in range(10, 31):
+        for t0 in range(10, 26):
             par, _ = curve_fit(s_exp.fit_f, t[t0:], corr[t0:], p0 = [0.02, 0.2], sigma=err_c[t0:])
-            print(t0, c_f.chi2(s_exp.f, par, t[t0:], corr[t0:], err_c[t0:]) / c_f.exp_chi2(s_exp.der_list(), par, t[t0:], cov_data[t0:, t0:]))
-
+            c_f = Corr_fits(s_exp.f, s_exp.der_list(), par, t[t0:], corr[t0:], cov_data[t0:, t0:])
+            print(t0, c_f.chi2() / c_f.exp_chi2(), c_f.p_val(10000) * 100)
+            
         xgrid = np.linspace(0, t[-1], 1000)
         plt.errorbar(t, corr, err_c, fmt="o", ecolor='black', elinewidth=2, markersize = 4)
         plt.plot(xgrid, s_exp.f(xgrid, par))
@@ -61,7 +60,7 @@ class main:
         err = np.zeros(0)
         for d in data:
             p = d.split()
-            if float(p[1]) / float(p[0]) < 0.10: 
+            if float(p[1]) / float(p[0]) < 0.05: 
                 c = np.append(c, float(p[0]))
                 err = np.append(err, float(p[1]))
             else:
