@@ -21,9 +21,8 @@ class Constant:
 const = Constant()
 
 class main:
-    def __init__(self, pd:str, pj:str):
+    def __init__(self, pd:str, pj:str, po:str):
         c = self.read_jack(pd, pj)
-
         em = np.zeros(0)
         err_em = np.zeros(0)
         em_jack = []
@@ -37,11 +36,14 @@ class main:
             for t_b in range(len(em_jack)):
                 cov_data[t_a, t_b] = em_jack[t_a].covariance(em_jack[t_b])
 
+        out = open(po, "w")
         t = np.array(range(2, len(c) - 1))
         for t0 in range(10, 26):
             par, _ = curve_fit(const.fit_f, t[t0:], em[t0:], p0 = [0.2], sigma=err_em[t0:])
             c_f = Corr_fits(const.f, const.der_list(), par, t[t0:], em[t0:], cov_data[t0:, t0:])
-            print(t0, c_f.chi2() / c_f.exp_chi2(), c_f.p_val(10000) * 100)
+            cov_par = c_f.cov_par()
+            print(t0, par[0], np.sqrt(cov_par[0, 0]), c_f.p_val(10000) * 100.0, file=out)
+        out.close()
         
         xgrid = np.linspace(0, t[-1], 1000)
         plt.errorbar(np.array(range(2, len(c) - 1)), em, err_em, fmt = "o", markersize=4)
@@ -59,7 +61,7 @@ class main:
 
         data = []
         for line in d:
-            if float(line.split()[1])/float(line.split()[0]) > 0.05:
+            if float(line.split()[1])/float(line.split()[0]) > 0.10:
                 break
             jack = np.zeros(25)
             for i in range(25):
@@ -73,8 +75,8 @@ class main:
         return data
 
 
-if len(sys.argv) < 2:
-    print("Usage " + sys.argv[0] + " mean_file jack_file")
+if len(sys.argv) < 4:
+    print("Usage " + sys.argv[0] + " mean_file jack_file out_file")
     exit(0)
 
-main(sys.argv[1], sys.argv[2])
+main(sys.argv[1], sys.argv[2], sys.argv[3])

@@ -32,7 +32,7 @@ class Corr_fits:
         
         return len(self.x) - sum
     
-    def P_matrix(self):
+    def H_matrix(self):
         err = self.error()
 
         H = np.zeros((len(self.par), len(self.par)))
@@ -40,6 +40,13 @@ class Corr_fits:
             for p2 in range(len(self.par)):
                 for i in range(len(self.x)):
                     H[p1][p2] += self.dl[p1](self.x[i], self.par) * self.dl[p2](self.x[i], self.par) / (err[i] ** 2.0)
+
+        return H
+    
+    def P_matrix(self):
+        err = self.error()
+
+        H = self.H_matrix()
         
         H_inv = np.linalg.inv(H)
 
@@ -78,3 +85,17 @@ class Corr_fits:
                 sum += 1
         
         return sum / n_sample
+    
+    def cov_par(self):
+        H = self.H_matrix()
+        H_inv = np.linalg.inv(H)
+        err = self.error()
+
+        prod = np.zeros((len(self.par), len(self.par)))
+        for alpha in range(len(self.par)):
+            for beta in range(len(self.par)):
+                for i in range(len(self.x)):
+                    for j in range(len(self.x)):
+                        prod[alpha][beta] += self.dl[alpha](self.x[i], self.par) * self.cov[i, j] * self.dl[beta](self.x[j], self.par) / (err[i] ** 2.0 * err[j] ** 2.0)
+        
+        return H_inv @ prod @ H_inv

@@ -24,7 +24,7 @@ class Single_exp:
 s_exp = Single_exp()
 
 class main:
-    def __init__(self, path_data:str, path_jack:str) -> None:
+    def __init__(self, path_data:str, path_jack:str, path_out:str) -> None:
         jack = self.read_jack(path_data, path_jack)
         
         cov_data = np.zeros((len(jack), len(jack)))
@@ -38,11 +38,14 @@ class main:
             corr[t], err_c[t] = jack[t].mean, np.sqrt(cov_data[t, t])
 
         t = np.array(range(len(corr)))
+        out = open(path_out, "w")
         for t0 in range(10, 26):
             par, _ = curve_fit(s_exp.fit_f, t[t0:], corr[t0:], p0 = [0.02, 0.2], sigma=err_c[t0:])
             c_f = Corr_fits(s_exp.f, s_exp.der_list(), par, t[t0:], corr[t0:], cov_data[t0:, t0:])
-            print(t0, c_f.chi2() / c_f.exp_chi2(), c_f.p_val(10000) * 100)
-            
+            cov_par = c_f.cov_par()
+            print(t0, par[0], np.sqrt(cov_par[0, 0]), par[1], np.sqrt(cov_par[1, 1]), c_f.p_val(10000) * 100.0, file=out)
+        out.close()
+
         xgrid = np.linspace(0, t[-1], 1000)
         plt.errorbar(t, corr, err_c, fmt="o", ecolor='black', elinewidth=2, markersize = 4)
         plt.plot(xgrid, s_exp.f(xgrid, par))
@@ -60,7 +63,7 @@ class main:
         err = np.zeros(0)
         for d in data:
             p = d.split()
-            if float(p[1]) / float(p[0]) < 0.05: 
+            if float(p[1]) / float(p[0]) < 0.10: 
                 c = np.append(c, float(p[0]))
                 err = np.append(err, float(p[1]))
             else:
@@ -90,8 +93,8 @@ class main:
         jf.close()
         return data
         
-if len(sys.argv) < 3:
-    print("Usage: " + sys.argv[0] + " data_file jack_file")
+if len(sys.argv) < 4:
+    print("Usage: " + sys.argv[0] + " data_file jack_file out_file")
     exit(1)
 
-main(sys.argv[1], sys.argv[2])
+main(sys.argv[1], sys.argv[2], sys.argv[3])
