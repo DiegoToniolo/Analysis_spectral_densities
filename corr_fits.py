@@ -67,6 +67,9 @@ class Corr_fits:
         W = np.diag(1/err)
         Id = np.diag(np.full(len(self.cov[:, 0]), 1.0))
         [val, vect] = np.linalg.eigh(self.cov)
+        for i in range(len(val)):
+            if val[i] < 0.0:
+                val[i] = 0.0
         C_sqrt = vect @ np.diag(np.sqrt(val)) @ vect.T
 
         nu = C_sqrt @ W @ (Id - self.P_matrix()) @ W @ C_sqrt

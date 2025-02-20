@@ -23,8 +23,32 @@ class Single_exp:
 
 s_exp = Single_exp()
 
+class Double_exp:
+    def fit_f(self, x, C1, m1, C2, m2):
+        return C1 * np.exp(-m1 * x) + C2 * np.exp(-m2 * x)
+    
+    def f(self, x, par):
+        return self.fit_f(x, par[0], par[1], par[2], par[3])
+    
+    def der0(self, x, par):
+        return np.exp(- par[1] * x)
+    
+    def der1(self, x, par):
+        return - par[0] * par[1] * x * np.exp(- par[1] * x)
+    
+    def der2(self, x, par):
+        return np.exp(- par[3] * x)
+    
+    def der3(self, x, par):
+        return - par[2] * par[3] * x * np.exp(- par[3] * x)
+    
+    def der_list(self):
+        return [self.der0, self.der1, self.der2, self.der3]
+
+d_exp = Double_exp()
+
 class main:
-    def __init__(self, path_data:str, path_jack:str, path_out:str) -> None:
+    def __init__(self, path_data:str, path_jack:str, path_out1:str, path_out2:str) -> None:
         jack = self.read_jack(path_data, path_jack)
         
         cov_data = np.zeros((len(jack), len(jack)))
@@ -38,23 +62,43 @@ class main:
             corr[t], err_c[t] = jack[t].mean, np.sqrt(cov_data[t, t])
 
         t = np.array(range(len(corr)))
-        out = open(path_out, "w")
+        out = open(path_out1, "w")
         for t0 in range(10, 26):
+            print("T0 = {}".format(t0))
             par, _ = curve_fit(s_exp.fit_f, t[t0:], corr[t0:], p0 = [0.02, 0.2], sigma=err_c[t0:])
             c_f = Corr_fits(s_exp.f, s_exp.der_list(), par, t[t0:], corr[t0:], cov_data[t0:, t0:])
             cov_par = c_f.cov_par()
             print(t0, par[0], np.sqrt(cov_par[0, 0]), par[1], np.sqrt(cov_par[1, 1]), c_f.p_val(10000) * 100.0, file=out)
+            xgrid = np.linspace(0, t[-1], 1000)
+            plt.errorbar(t, corr, err_c, fmt="o", ecolor='black', elinewidth=2, markersize = 4)
+            plt.plot(xgrid, s_exp.f(xgrid, par))
+            plt.semilogy()
+            plt.xlabel(r"$t/a$")
+            plt.ylabel(r"Correlator")
+            plt.grid(True)
+            plt.title(r"Fit of the correlator, $C(t) = C_1 e^{-m_1\,t}$")
+            plt.savefig("out/vector/plots/fits/single_t0_{}.png".format(t0))
+            plt.close()
         out.close()
 
-        xgrid = np.linspace(0, t[-1], 1000)
-        plt.errorbar(t, corr, err_c, fmt="o", ecolor='black', elinewidth=2, markersize = 4)
-        plt.plot(xgrid, s_exp.f(xgrid, par))
-        plt.semilogy()
-        plt.xlabel(r"$t/a$")
-        plt.ylabel(r"Correlator")
-        plt.grid(True)
-        plt.savefig("plot.png")
-        plt.close()
+        out = open(path_out2, "w")
+        for t0 in range(0, 21):
+            print("T0 = {}".format(t0))
+            par, _ = curve_fit(d_exp.fit_f, t[t0:], corr[t0:], p0 = [0.02, 0.2, 0.02, 0.5], sigma=err_c[t0:])
+            c_f = Corr_fits(d_exp.f, d_exp.der_list(), par, t[t0:], corr[t0:], cov_data[t0:, t0:])
+            cov_par = c_f.cov_par()
+            print(t0, par[0], np.sqrt(cov_par[0, 0]), par[1], np.sqrt(cov_par[1, 1]), end=" ", file=out)
+            print(par[2], np.sqrt(cov_par[2, 2]), par[3], np.sqrt(cov_par[3, 3]), c_f.p_val(10000) * 100.0, file=out)
+            plt.errorbar(t, corr, err_c, fmt="o", ecolor='black', elinewidth=2, markersize = 4)
+            plt.plot(xgrid, d_exp.f(xgrid, par))
+            plt.semilogy()
+            plt.xlabel(r"$t/a$")
+            plt.ylabel(r"Correlator")
+            plt.grid(True)
+            plt.title(r"Fit of the correlator, $C(t) = C_1 e^{-m_1\,t} + C_2 e^{-m_2\,t}$")
+            plt.savefig("out/vector/plots/fits/double_t0_{}.png".format(t0))
+            plt.close()
+        out.close()
 
     def read_points(self, path:str):
         df = open(path, "r")
@@ -93,8 +137,8 @@ class main:
         jf.close()
         return data
         
-if len(sys.argv) < 4:
-    print("Usage: " + sys.argv[0] + " data_file jack_file out_file")
+if len(sys.argv) < 5:
+    print("Usage: " + sys.argv[0] + " data_file jack_file out_file_single out_file_double")
     exit(1)
 
-main(sys.argv[1], sys.argv[2], sys.argv[3])
+main(sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4])
