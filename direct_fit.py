@@ -34,13 +34,13 @@ class Double_exp:
         return np.exp(- par[1] * x)
     
     def der1(self, x, par):
-        return - par[0] * par[1] * x * np.exp(- par[1] * x)
+        return - par[0] * x * np.exp(- par[1] * x)
     
     def der2(self, x, par):
         return np.exp(- par[3] * x)
     
     def der3(self, x, par):
-        return - par[2] * par[3] * x * np.exp(- par[3] * x)
+        return - par[2] * x * np.exp(- par[3] * x)
     
     def der_list(self):
         return [self.der0, self.der1, self.der2, self.der3]
