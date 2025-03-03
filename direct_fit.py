@@ -87,6 +87,13 @@ class main:
             par, _ = curve_fit(d_exp.fit_f, t[t0:], corr[t0:], p0 = [0.02, 0.2, 0.02, 0.5], sigma=err_c[t0:])
             c_f = Corr_fits(d_exp.f, d_exp.der_list(), par, t[t0:], corr[t0:], cov_data[t0:, t0:])
             cov_par = c_f.cov_par()
+            if t0 == 10:
+                f = open("out/vector/data/fits/cov.txt", "w")
+                for i in range(len(cov_par[:, 0])):
+                    for j in range(len(cov_par[:, 0])):
+                        print(cov_par[i, j], file=f)
+                f.close()
+                        
             print(t0, par[0], np.sqrt(cov_par[0, 0]), par[1], np.sqrt(cov_par[1, 1]), end=" ", file=out)
             print(par[2], np.sqrt(cov_par[2, 2]), par[3], np.sqrt(cov_par[3, 3]), c_f.p_val(10000) * 100.0, file=out)
             plt.errorbar(t, corr, err_c, fmt="o", ecolor='black', elinewidth=2, markersize = 4)
