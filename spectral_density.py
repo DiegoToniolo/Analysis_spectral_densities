@@ -265,14 +265,10 @@ class SDnum_np:
 
     def f_integral(self, w1, a, sigma):
         w0 = SDnum_np.w0
-        f = lambda x: x**2. * np.exp(-a*x) * norm(w1, sigma).pdf(x)
 
-        res = np.exp(-a*w0 - (w0-w1)**2./(2.*sigma**2.))/(2.*np.sqrt(np.pi))*(np.sqrt(2.)*sigma*(w0+w1-a*sigma**2.) + \
-            np.sqrt(np.pi) * (sigma**2. + (w1-a*sigma**2.)**2.)*np.exp((w0-w1+a*sigma**2.)**2./(2.*sigma**2.))
-            *erfc((w0-w1+a*sigma**2.)/(np.sqrt(2.)*sigma)))
-        
-        if np.isinf(res) or np.isnan(res):
-            return quad(f, w0, +np.inf)[0]
+        res = float(mpmath.exp(-a*w0 - (w0-w1)**2./(2.*sigma**2.))/(2.*mpmath.sqrt(np.pi))*(mpmath.sqrt(2.)*sigma*(w0+w1-a*sigma**2.) + \
+            mpmath.sqrt(mpmath.pi) * (sigma**2. + (w1-a*sigma**2.)**2.)*mpmath.exp((w0-w1+a*sigma**2.)**2./(2.*sigma**2.))
+            *mpmath.erfc((w0-w1+a*sigma**2.)/(np.sqrt(2.)*sigma))))
         
         return res
 
@@ -301,7 +297,7 @@ class SDnum_np:
         return SDnum_np.A_inv @ SDnum_np.f
     
     def rho(self, corr):
-        return (self.g()[:len(corr)].T @ corr)[0]
+        return (self.g()[:len(corr)].T @ corr)
     
     def err_rho(self, cov):
         J = self.g()
@@ -410,7 +406,7 @@ class SDan_sm:
 
     def rho_k_a(self, w, par, a, s):
         return (par[2] * self.kernel(par[3], w, a, s)/(par[3]**2.0) + par[0] * \
-            self.kernel(par[1], w, a, s)/(par[1]**2.0))[0]
+            self.kernel(par[1], w, a, s)/(par[1]**2.0))
 
     def kernel_d_m(self, m, w, a, s):
         f = lambda x: (2.0 * (-0.5 - x * 1.0j) * self.u_s(x, m).conjugate() * self.H_a(x, a) *\
@@ -435,7 +431,7 @@ class SDan_sm:
         return np.array([self.r_k_d_C0(w, par, a, s), self.r_k_d_m0(w, par, a, s), self.r_k_d_C1(w, par, a, s), self.r_k_d_m1(w, par, a, s)])
 
     def err_r_k_a(self, w, par, a, s, cov):
-        return np.sqrt((self.jac_r_k(w, par, a, s).T @ cov @ self.jac_r_k(w, par, a, s))[0, 0])
+        return np.sqrt((self.jac_r_k(w, par, a, s).T @ cov @ self.jac_r_k(w, par, a, s)))
     
     def rho(self, w, par, a, sigma):
         if a == 0:
@@ -471,6 +467,9 @@ class Double_exp:
     
     def der3(self, x, par):
         return - par[2] * x * mpmath.exp(- par[3] * x)
+    
+    def der_list(self):
+        return [self.der0, self.der1, self.der2, self.der3]
     
     def jac(self, x, par):
         return mpmath.matrix([self.der0(x, par), self.der1(x, par), self.der2(x, par), self.der3(x, par)])

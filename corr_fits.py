@@ -102,3 +102,23 @@ class Corr_fits:
                         prod[alpha][beta] += self.dl[alpha](self.x[i], self.par) * self.cov[i, j] * self.dl[beta](self.x[j], self.par) / (err[i] ** 2.0 * err[j] ** 2.0)
         
         return H_inv @ prod @ H_inv
+    
+    def jac_matrix(self):
+        J = np.zeros((len(self.par), len(self.x)))
+        for alpha in range(len(self.par)):
+            for i in range(len(self.x)):
+                J[alpha, i] = self.dl[alpha](self.x[i], self.par)
+
+        return J
+    
+    def cov_par_data(self, C:np.ndarray = None):
+        H = self.H_matrix()
+        H_inv = np.linalg.inv(H)
+        err = self.error()
+        W = np.diag(1/err)
+        J = self.jac_matrix()
+
+        if not isinstance(C, np.ndarray):
+            return H_inv @ J @ W @ W @ self.cov
+        else:
+            return H_inv @ J @ W @ W @ C

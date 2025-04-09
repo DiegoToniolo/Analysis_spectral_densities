@@ -1,10 +1,15 @@
 import numpy as np
+from scipy.optimize import curve_fit
 
 class Jackknife:
-    def __init__(self, data:np.ndarray=np.array([0, 0])):
-        self.mean, self.jack = self.jacknife(data)
+    def __init__(self, data:np.ndarray=None):
+        if data != None:
+            self.mean, self.jack = self.jacknife(data)
+        else:
+            self.mean = 0
+            self.jack = np.zeros(0)
     
-    def jacknife(self, a):
+    def jacknife(self, a) -> list[float, np.ndarray]:
         mean = np.mean(a, dtype='f8')
         jack = np.zeros(len(a), dtype='f8')
         for i in range(len(a)):
@@ -12,10 +17,10 @@ class Jackknife:
     
         return mean, jack
     
-    def variance(self):
+    def variance(self) -> float:
         return (len(self.jack) - 1) * np.var(self.jack)
     
-    def covariance(self, var):
+    def covariance(self, var) -> float:
         if not self.iscompatible(var):
             exit(1)
         elif isinstance(var, float):
@@ -23,7 +28,7 @@ class Jackknife:
         else:
             return (len(self.jack) - 1) * np.sum((self.jack - np.mean(self.jack)) * (var.jack - np.mean(var.jack)), dtype='f8') /len(self.jack)
     
-    def iscompatible(self, var):
+    def iscompatible(self, var) -> bool:
         if not isinstance(var, Jackknife) and not isinstance(var, float):
             print("Non compatible types: Jacknife + " + str(type(var)))
             return False
@@ -79,9 +84,49 @@ class Jackknife:
             quo.jack = self.jack / var
             return quo
 
-    def der_function(self, f:callable):
+    def der_function(f:callable, list_jack:list):
         res = Jackknife()
-        res.mean = f(self.mean)
-        res.jack = f(self.jack)
+        av = np.zeros(0)
+        for i in range(len(list_jack)):
+            av = np.append(av, list_jack[i].mean)
 
+        res.mean = f(av)
+        res.jack = np.zeros(0)
+        for i in range(len(list_jack[0].jack)):
+            v = np.zeros(0)
+            for j in range(len(list_jack)):
+                v = np.append(v, list_jack[j].jack[i])
+            res.jack = np.append(res.jack, f(v))
         return res
+    
+    def to_lists(list_jack) -> list[np.ndarray, np.ndarray, np.ndarray]:
+        av = np.zeros(0)
+        cov = np.zeros((len(list_jack), len(list_jack)))
+
+        for i in range(len(list_jack)):
+            av = np.append(av, list_jack[i].mean)
+            for j in range(len(list_jack)):
+                cov[i, j] = list_jack[i].covariance(list_jack[j])
+        
+        return av, np.sqrt(np.diagonal(cov)), cov
+    
+    def fit(f:callable, x:np.ndarray, y_jack:list, p_init:np.ndarray) -> list:
+        y_m, y_err, _ = Jackknife.to_lists(y_jack)
+        par_m, _ = curve_fit(f, x, y_m, p0 = p_init, sigma = y_err)
+
+        par_jack = []
+        for i in range(len(par_m)):
+            par_jack.append(Jackknife())
+            par_jack[-1].mean = par_m[i]
+            par_jack[-1].jack = np.zeros(len(y_jack[0].jack))
+        
+        for i in range(len(y_jack[0].jack)):
+            y = []
+            for j in range(len(y_m)):
+                y.append(y_jack[j].jack[i])
+            pj, _ = curve_fit(f, x, y, p0 = par_m, sigma = y_err)
+            for j in range(len(par_jack)):
+                par_jack[j].jack[i] = pj[j]
+        
+        return par_jack
+        
