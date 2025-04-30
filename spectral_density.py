@@ -481,3 +481,30 @@ class Double_exp:
         cov_par = mpmath.matrix(cov_par)
         return (self.jac(x1, par).T * cov_par * self.jac(x2, par))[0, 0]
     
+class Double_exp_np:
+    def fit_f(self, x, C1, m1, C2, m2):
+        return C1 * np.exp(-m1 * x) + C2 * np.exp(-m2 * x)
+    
+    def f(self, x, par):
+        return self.fit_f(x, par[0], par[1], par[2], par[3])
+    
+    def der0(self, x, par):
+        return np.exp(- par[1] * x)
+    
+    def der1(self, x, par):
+        return - par[0] * x * np.exp(- par[1] * x)
+    
+    def der2(self, x, par):
+        return np.exp(- par[3] * x)
+    
+    def der3(self, x, par):
+        return - par[2] * x * np.exp(- par[3] * x)
+    
+    def der_list(self):
+        return [self.der0, self.der1, self.der2, self.der3]
+    
+    def jac(self, x, par):
+        return np.array([self.der0(x, par), self.der1(x, par), self.der2(x, par), self.der3(x, par)])
+    
+    def cov_matrix(self, x1, x2, par, cov_par):
+        return (self.jac(x1, par).T @ cov_par @ self.jac(x2, par))
