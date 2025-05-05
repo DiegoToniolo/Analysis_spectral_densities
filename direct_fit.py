@@ -130,9 +130,12 @@ class main:
         d = df.readlines()
 
         data = []
+        t_max = 0
         for line in d:
-            if float(line.split()[1])/float(line.split()[0]) > 0.10:
+            if float(line.split()[1])/float(line.split()[0]) > 0.30:
+                print("t_max = {}".format(t_max-1))
                 break
+            t_max += 1 
             jack = np.zeros(25)
             for i in range(25):
                 jack[i]  = float(jf.readline())
