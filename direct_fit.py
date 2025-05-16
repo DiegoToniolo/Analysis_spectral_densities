@@ -87,8 +87,8 @@ class main:
             par, _ = curve_fit(d_exp.fit_f, t[t0:], corr[t0:], p0 = [0.02, 0.2, 0.02, 0.5], sigma=err_c[t0:])
             c_f = Corr_fits(d_exp.f, d_exp.der_list(), par, t[t0:], corr[t0:], cov_data[t0:, t0:])
             cov_par = c_f.cov_par()
-            if t0 == 10:
-                f = open("out/vector/data/fits/cov.txt", "w")
+            if t0 == 8:
+                f = open("out/vector/data/fits/cov_b.txt", "w")
                 for i in range(len(cov_par[:, 0])):
                     for j in range(len(cov_par[:, 0])):
                         print(cov_par[i, j], file=f)
