@@ -444,6 +444,29 @@ class SDan_sm:
             return self.err_rho_na(w, par, sigma, cov)
         else:
             return self.err_r_k_a(w, par, a, sigma, cov)
+        
+class SD_2exp:
+    kernels = {
+        "Gaussian": lambda w, w1, sigma: norm(w1, sigma).pdf(w),
+        "Tikhonov": lambda w, w1, sigma: quad(lambda x: (w**complex(-0.5, -x) * w1**complex(-0.5, x)/(np.pi + sigma*np.cosh(np.pi * x))).real, 0, +np.inf)[0],
+        "Breit-Wigner": lambda w, w1, sigma:sigma/(np.pi * ((w-w1)**2.0 + sigma**2.0))
+    }
+
+    der_ker = {
+        "Gaussian": lambda w, w1, sigma: norm(w1, sigma).pdf(w) * (w1 - w)/(sigma ** 2.0),
+        "Tikhonov": lambda w, w1, sigma: quad(lambda x: (-(complex(0.5, x)/w) * w**complex(-0.5, -x) * w1**complex(-0.5, x)/(np.pi + sigma*np.cosh(np.pi * x))).real, 0, +np.inf)[0],
+        "Breit-Wigner": lambda w, w1, sigma: (2.*(w1-w)*sigma) / (np.pi * ((w-w1)**2.0 + sigma **2.0)**2.0)
+    }
+    
+    def rho(w, m, par, cov, smearing = "Tikhonov", sigma = 1e-6, print_J = False):
+        J = np.array([SD_2exp.kernels[smearing](par[1], w, sigma)/(par[1]**m), \
+                      par[0]*(-m/(par[1]**(m+1))*SD_2exp.kernels[smearing](par[1], w, sigma) + SD_2exp.der_ker[smearing](par[1], w, sigma)/(par[1]**m)),\
+                      SD_2exp.kernels[smearing](par[3], w, sigma)/(par[3]**m), \
+                      par[2]*(-m/(par[3]**(m+1))*SD_2exp.kernels[smearing](par[3], w, sigma) + SD_2exp.der_ker[smearing](par[3], w, sigma)/(par[3]**m))])
+        r = par[0] * SD_2exp.kernels[smearing](par[1], w, sigma) / (par[1]**m) + \
+               par[2] * SD_2exp.kernels[smearing](par[3], w, sigma) / (par[3]**m)
+        
+        return (not print_J)*(r, np.sqrt(J.T @ cov @ J)) + (print_J)*(r, J)
 
 #Class of the correlator
 class Double_exp:
