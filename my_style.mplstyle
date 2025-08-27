@@ -1,13 +1,13 @@
 # my_style.mplstyle
 axes.titlesize       : 18
-axes.labelsize       : 14
+axes.labelsize       : 16
 axes.grid            : True
 grid.linestyle       : -
 grid.alpha           : 0.6
 lines.linewidth      : 1.75
 lines.markersize     : 6
-xtick.labelsize      : 12
-ytick.labelsize      : 12
+xtick.labelsize      : 14
+ytick.labelsize      : 14
 ytick.right          : True
 figure.figsize       : 8, 5
 font.family          : serif
