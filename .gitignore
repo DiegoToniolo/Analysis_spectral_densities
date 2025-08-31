@@ -1,5 +1,8 @@
 *.txt
 *.in
 *.png
+*.pdf
+*.tar
+*.tar.gz
 !read_connected.in
 !plot_corr.in
